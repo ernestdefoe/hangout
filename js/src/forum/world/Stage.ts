@@ -1000,6 +1000,8 @@ export default class Stage {
       if (!hit) break;
       y = hit.y - h - 6;
     }
+    // Never above the top of the stage: lower it over the head instead (the tail is dropped then).
+    y = Math.max(4, y);
     taken.push({ x, y, w, h });
     g.save();
     g.globalAlpha = alpha;
