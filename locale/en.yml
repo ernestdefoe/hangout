@@ -7,6 +7,7 @@ ernestdefoe-hangout:
     head:
       here: "{count, plural, one {# here} other {# here}}"
       doors: "doors to {doors}"
+      doors_to: doors to
     stage:
       label: The room and the people in it
       hint: Tap the floor to walk · tap someone for their card · arrow keys walk too

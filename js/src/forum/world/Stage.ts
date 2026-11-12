@@ -355,9 +355,11 @@ export default class Stage {
       const py = WALL + a.y * T + T * 0.8;
       if (w.x > px - 20 && w.x < px + 20 && w.y > py - 82 && w.y < py + 4) return { kind: 'person', id: a.p.id };
     }
+    // Doors get a generous margin: a side door is a thin strip, too small for a finger.
+    const pad = T * 0.6;
     for (const e of this.room.exits) {
       const r = this.doorRect(e);
-      if (w.x >= r.x && w.x <= r.x + r.w && w.y >= r.y && w.y <= r.y + r.h) return { kind: 'exit', id: e.id };
+      if (w.x >= r.x - pad && w.x <= r.x + r.w + pad && w.y >= r.y - pad && w.y <= r.y + r.h + pad) return { kind: 'exit', id: e.id };
     }
     for (const item of this.room.items) {
       if (item.k !== 'board') continue;
@@ -418,6 +420,14 @@ export default class Stage {
       this.walkSelf(x, y, () => this.hooks.exit(exit));
     } else if (h.kind === 'floor') this.walkSelf(h.x!, h.y!);
   };
+
+  /** Walk to a door and go through it (the door buttons and the "doors to…" line). */
+  goTo(exit: Exit) {
+    const [x, y] = this.doorTile(exit);
+    const me = this.hooks.meId && this.actors.get(this.hooks.meId);
+    if (me && Math.round(me.x) === x && Math.round(me.y) === y && !me.path.length) this.hooks.exit(exit);
+    else this.walkSelf(x, y, () => this.hooks.exit(exit));
+  }
 
   private cancel = (e: PointerEvent) => {
     this.pointers.delete(e.pointerId);

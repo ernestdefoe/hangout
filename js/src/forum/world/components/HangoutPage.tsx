@@ -307,7 +307,7 @@ export default class HangoutPage extends Page {
               {room ? (
                 <span className="HangoutHead-sub">
                   {t('head.here', { count: here })}
-                  {room.exits.length ? ' · ' + tt('head.doors', { doors: room.exits.map((e) => e.room || e.name).join(', ') }) : ''}
+                  {room.exits.length ? [' · ', t('head.doors_to'), ' ', room.exits.map((e, i) => [i ? ', ' : '', this.doorButton(e)])] : null}
                 </span>
               ) : null}
             </div>
@@ -337,10 +337,26 @@ export default class HangoutPage extends Page {
     );
   }
 
+  doorButton(e: Exit) {
+    if (!this.live.me) return e.room || e.name;
+    return (
+      <button type="button" className="HangoutDoor" onclick={() => this.stage?.goTo(e)}>
+        {e.room || e.name}
+      </button>
+    );
+  }
+
   emotes() {
     const target = this.cardId && this.cardId !== this.live.me?.id ? this.live.people.get(this.cardId) : null;
     return (
       <div className="HangoutEmotes" role="toolbar" aria-label={tt('emotes.label')}>
+        {this.phone
+          ? (this.live.room?.exits || []).map((e) => (
+              <button type="button" className="HangoutEmotes-button HangoutEmotes-button--door" onclick={() => this.stage?.goTo(e)}>
+                {'→ ' + (e.room || e.name).replace(/^The /, '')}
+              </button>
+            ))
+          : null}
         {EMOTES.map((e) => (
           <button
             type="button"

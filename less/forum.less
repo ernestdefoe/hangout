@@ -208,6 +208,12 @@ html:not(#x-hi) .HangoutBoard-list a { color: var(--control-color); font-weight:
   }
 }
 
+html:not(#x-hi) .HangoutDoor {
+  border: 0; background: none; padding: 0; margin: 0; font: inherit; cursor: pointer;
+  color: var(--link-color, var(--primary-color)); text-decoration: underline; text-underline-offset: 2px;
+}
+.HangoutEmotes-button--door { background: var(--primary-color); color: var(--button-primary-color, #fff); }
+
 // Phase two: channels, mail, the board.
 .HangoutLine-chan { font-size: 11px; font-weight: 700; color: var(--muted-color); }
 .HangoutWho-friend { color: var(--primary-color); }
