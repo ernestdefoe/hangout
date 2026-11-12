@@ -455,6 +455,8 @@ export default class Stage {
   walkSelf(x: number, y: number, then?: () => void) {
     const me = this.hooks.meId && this.actors.get(this.hooks.meId);
     if (!me) return;
+    // One person per tile: someone already there (or headed there) moves our target to the nearest free tile.
+    if (!then) [x, y] = this.nearestFree(x, y, me.p.id);
     const path = this.findPath([Math.round(me.x), Math.round(me.y)], [x, y]);
     if (!path) return;
     this.target = { x, y, t: performance.now() };
@@ -464,6 +466,28 @@ export default class Stage {
     this.arrive = then || null;
     if (path.length) this.hooks.walk(x, y);
     else if (then) then();
+  }
+
+  /** The nearest walkable tile nobody else stands on or is walking to (Furniture + people), spiralling out. */
+  nearestFree(x: number, y: number, mover: number): [number, number] {
+    const taken = new Set<number>();
+    for (const a of this.actors.values()) {
+      if (a.p.id === mover || a.leaving) continue;
+      taken.add((a.p.y ?? Math.round(a.y)) * 256 + (a.p.x ?? Math.round(a.x)));
+      taken.add(Math.round(a.y) * 256 + Math.round(a.x));
+    }
+    const r = this.room!;
+    for (let d = 0; d < Math.max(r.w, r.h); d++) {
+      for (let dy = -d; dy <= d; dy++) {
+        for (let dx = -d; dx <= d; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== d) continue;
+          const tx = x + dx;
+          const ty = y + dy;
+          if (this.walkable(tx, ty) && !taken.has(ty * 256 + tx)) return [tx, ty];
+        }
+      }
+    }
+    return [x, y];
   }
 
   step(dx: number, dy: number) {
@@ -481,6 +505,9 @@ export default class Stage {
       if (exit) this.hooks.exit(exit);
       return;
     }
+    // Someone is standing there: stay put rather than jump to another tile.
+    const [fx, fy] = this.nearestFree(x, y, me.p.id);
+    if (fx !== x || fy !== y) return;
     this.walkSelf(x, y);
   }
 
@@ -1000,11 +1027,15 @@ export default class Stage {
     // A lifted tag keeps a thin line down to its owner, so it's clear whose it is.
     if (y < at.home - 4) {
       const cx = this.sx(a.x * T + T / 2);
-      g.strokeStyle = 'rgba(18,20,26,0.55)';
-      g.lineWidth = 1.5;
+      g.lineCap = 'round';
       g.beginPath();
       g.moveTo(cx, y + 17);
       g.lineTo(cx, at.home + 14);
+      g.strokeStyle = 'rgba(18,20,26,0.85)';
+      g.lineWidth = 3.5;
+      g.stroke();
+      g.strokeStyle = me ? '#e8833a' : '#ffffff';
+      g.lineWidth = 1.5;
       g.stroke();
     }
     pill(g, x, y, w, 17, me ? 'rgba(232,131,58,0.95)' : 'rgba(18,20,26,0.86)');

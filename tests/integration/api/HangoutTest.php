@@ -288,4 +288,23 @@ class HangoutTest extends TestCase
         $this->assertSame('unknown', $this->act(2, '/blorp')['out'][0]['k']);
         $this->assertSame('tell', $this->act(2, 'tell dana = hi')['e'][0]['k']);
     }
+
+    #[Test]
+    public function two_people_never_share_a_tile(): void
+    {
+        foreach ([2, 3, 4] as $id) {
+            $this->api('GET', '', $id);
+        }
+        $where = fn (int $id) => $this->database()->table('hangout_presence')->where('user_id', $id)->first(['x', 'y']);
+        $spots = array_map(fn ($id) => $where($id)->x.','.$where($id)->y, [2, 3, 4]);
+        $this->assertCount(3, array_unique($spots), 'arrivals spread out');
+
+        $first = $this->api('POST', '/act', 2, ['walk' => [3, 9]])[1];
+        $this->assertSame([3, 9], [$first['x'], $first['y']]);
+        $second = $this->api('POST', '/act', 3, ['walk' => [3, 9]])[1];
+        $this->assertTrue($second['ok']);
+        $this->assertNotSame([3, 9], [$second['x'], $second['y']], 'a taken tile resolves to a free one');
+        $this->assertLessThanOrEqual(1, max(abs($second['x'] - 3), abs($second['y'] - 9)), 'the nearest free one');
+        $this->assertSame($second['x'].','.$second['y'], $where(3)->x.','.$where(3)->y);
+    }
 }

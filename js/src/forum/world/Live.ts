@@ -173,7 +173,13 @@ export default class Live {
   }
 
   walk(x: number, y: number) {
-    call('POST', '/act', { walk: [x, y] }).catch(() => {});
+    call<{ ok: boolean; x?: number; y?: number }>('POST', '/act', { walk: [x, y] })
+      .then((res) => {
+        // The server keeps one person per tile; if it put us somewhere else, walk there.
+        if (this.me && res.ok && res.x !== undefined && res.y !== undefined && (res.x !== x || res.y !== y))
+          this.stage?.walkTo(this.me.id, res.x, res.y);
+      })
+      .catch(() => {});
   }
 
   async exit(id: number) {

@@ -310,18 +310,25 @@ final class World
 
     // ── moving ──────────────────────────────────────────────────
 
-    /** Walk to a floor tile in the same room. */
-    public function walk(User $user, object $presence, int $x, int $y): bool
+    /**
+     * Walk to a floor tile in the same room. Two people never share a tile: a
+     * tile someone else stands on resolves to the nearest free one. Returns
+     * where they ended up, or null for a tile they can't stand on.
+     *
+     * @return array{0: int, 1: int}|null
+     */
+    public function walk(User $user, object $presence, int $x, int $y): ?array
     {
         $room = $this->room((int) $presence->room_id);
         if (! $room || $x < 0 || $y < 0 || $x >= $room->width || $y >= $room->height) {
-            return false;
+            return null;
         }
         if (isset(Furniture::blocked($this->items((int) $room->id))[$y * 256 + $x])) {
-            return false;
+            return null;
         }
+        [$x, $y] = $this->nearestFree($room, [$x, $y], (int) $user->id);
         if ((int) $presence->x === $x && (int) $presence->y === $y) {
-            return true;
+            return [$x, $y];
         }
         $this->db->table('hangout_presence')->where('user_id', $user->id)->update(['x' => $x, 'y' => $y]);
         $this->events->write([
@@ -329,7 +336,7 @@ final class World
             'data' => ['x' => $x, 'y' => $y],
         ]);
 
-        return true;
+        return [$x, $y];
     }
 
     /** Go through a door (or be moved) into another room. */
@@ -358,8 +365,6 @@ final class World
     /** Where someone appears: by the door back to where they came from, else the middle. @return array{0: int, 1: int} */
     public function spawn(object $room, ?object $from): array
     {
-        $blocked = Furniture::blocked($this->items((int) $room->id));
-        $taken = $this->db->table('hangout_presence')->where('room_id', $room->id)->get(['x', 'y'])->map(fn ($p) => $p->y * 256 + $p->x)->flip()->all();
         // Somewhere near the front middle, a little different each time, so arrivals don't stack up.
         $start = [intdiv((int) $room->width, 2) + random_int(-3, 3), max(0, (int) $room->height - 3 + random_int(-1, 1))];
         if ($from) {
@@ -370,15 +375,36 @@ final class World
                 }
             }
         }
-        // The nearest free tile, spiralling out.
-        for ($r = 0; $r < 12; $r++) {
+
+        return $this->nearestFree($room, $start, null);
+    }
+
+    /**
+     * The nearest floor tile to $start that no furniture and nobody else
+     * (other than $mover) stands on, spiralling out. One person per tile.
+     *
+     * @param  array{0: int, 1: int}  $start
+     * @return array{0: int, 1: int}
+     */
+    public function nearestFree(object $room, array $start, ?int $mover): array
+    {
+        $blocked = Furniture::blocked($this->items((int) $room->id));
+        $q = $this->db->table('hangout_presence')->where('room_id', $room->id);
+        if ($mover) {
+            $q->where('user_id', '!=', $mover);
+        }
+        $taken = $q->get(['x', 'y'])->map(fn ($p) => (int) $p->y * 256 + (int) $p->x)->flip()->all();
+        $w = (int) $room->width;
+        $h = (int) $room->height;
+        for ($r = 0; $r < max($w, $h); $r++) {
             for ($dy = -$r; $dy <= $r; $dy++) {
                 for ($dx = -$r; $dx <= $r; $dx++) {
                     if (max(abs($dx), abs($dy)) !== $r) {
                         continue;
                     }
                     [$x, $y] = [$start[0] + $dx, $start[1] + $dy];
-                    if ($x >= 0 && $y >= 0 && $x < $room->width && $y < $room->height && ! isset($blocked[$y * 256 + $x]) && ($r > 6 || ! isset($taken[$y * 256 + $x]))) {
+                    $k = $y * 256 + $x;
+                    if ($x >= 0 && $y >= 0 && $x < $w && $y < $h && ! isset($blocked[$k]) && ! isset($taken[$k])) {
                         return [$x, $y];
                     }
                 }

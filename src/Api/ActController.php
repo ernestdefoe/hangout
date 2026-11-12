@@ -12,7 +12,7 @@ use Psr\Http\Message\ServerRequestInterface;
 /**
  * POST /api/hangout/act: doing something.
  *   {line: "say hello"}  any command, as typed or sent by a button
- *   {walk: [x, y]}       walk to a floor tile (sent once, on arrival intent)
+ *   {walk: [x, y]}       walk to a floor tile (sent once); answers where they ended up
  *   {exit: id}           go through a door
  */
 class ActController extends Controller
@@ -34,9 +34,10 @@ class ActController extends Controller
                 throw new HangoutException('slow_down', 429);
             }
             $this->world->touch($actor, $ctx->presence);
-            $ok = $this->world->walk($actor, $ctx->presence, (int) ($body['walk'][0] ?? -1), (int) ($body['walk'][1] ?? -1));
+            $at = $this->world->walk($actor, $ctx->presence, (int) ($body['walk'][0] ?? -1), (int) ($body['walk'][1] ?? -1));
 
-            return ['ok' => $ok];
+            // Where they really ended up: a taken tile resolves to the nearest free one.
+            return $at ? ['ok' => true, 'x' => $at[0], 'y' => $at[1]] : ['ok' => false];
         }
 
         if (isset($body['exit'])) {
