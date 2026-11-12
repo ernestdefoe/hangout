@@ -983,9 +983,10 @@ export default class Stage {
     const rank = this.hooks.ranks.name(p.rk);
     g.font = `600 11px ${this.font}`;
     const nameW = g.measureText(p.n).width;
-    g.font = `600 10px ${this.font}`;
+    // The rank in small capitals: at 10 px a lower-case "Deity" reads as "Delty".
+    g.font = `700 9px ${this.font}`;
     const showRank = p.rk !== 'mortal' && !!rank;
-    const rankW = showRank ? g.measureText(rank).width + 7 : 0;
+    const rankW = showRank ? g.measureText(rank.toUpperCase()).width + rank.length * 0.6 + 8 : 0;
     return { w: Math.ceil(nameW + rankW + 15), nameW, rank, showRank };
   }
 
@@ -1013,9 +1014,10 @@ export default class Stage {
     g.fillStyle = me ? '#1a1d25' : '#ffffff';
     g.fillText(p.n, x + 7, y + 9);
     if (showRank) {
-      g.font = `600 10px ${this.font}`;
+      g.font = `700 9px ${this.font}`;
       g.fillStyle = me ? '#1a1d25' : this.hooks.ranks.color(p.rk);
-      g.fillText(rank, x + 7 + nameW + 7, y + 9);
+      if ('letterSpacing' in g) (g as any).letterSpacing = '0.6px';
+      g.fillText(rank.toUpperCase(), x + 7 + nameW + 7, y + 9.5);
     }
     g.restore();
   }
