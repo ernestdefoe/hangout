@@ -21,7 +21,7 @@ ernestdefoe-hangout:
       more: More…
     bar:
       label: Say something, or type a command
-      placeholder: "Say something to {room}… (or type help)"
+      placeholder: "Say something, or type help"
       say: Say
       guest: Log in to walk in and talk.
       cannot_talk: You can look around, but you can't talk here.

@@ -952,7 +952,7 @@ export default class Stage {
     const showRank = p.rk !== 'mortal';
     const rankW = showRank ? g.measureText(rank).width + 6 : 0;
     const w = nameW + rankW + 14;
-    const x = this.sx(a.x * T + T / 2) - w / 2;
+    const x = Math.max(2, Math.min(this.cssW() - w - 2, this.sx(a.x * T + T / 2) - w / 2));
     const y = this.sy(WALL + a.y * T + T * 0.8 - 86) - 20 - (a.anim === 'dance' ? 4 : 0);
     g.save();
     g.globalAlpha = Math.max(0, Math.min(1, a.fade));

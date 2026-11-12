@@ -53,7 +53,7 @@ export default class HangoutPage extends Page {
     this.live.onUi = (ui) => this.ui(ui);
     // Idle times and the sky move by the minute; nothing else redraws on a timer.
     this.tick = window.setInterval(() => m.redraw(), 30000);
-    window.setTimeout(() => ((this.hintGone = true), m.redraw()), 9000);
+    window.setTimeout(() => ((this.hintGone = true), m.redraw()), 7000);
   }
 
   oncreate(vnode: Mithril.VnodeDOM) {
