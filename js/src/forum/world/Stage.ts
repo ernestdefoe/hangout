@@ -804,8 +804,15 @@ export default class Stage {
     const placed = [...seen].reverse().map((a) => ({ a, at: this.placeTag(g, a, tags, seen) }));
     for (const { a, at } of placed.reverse()) this.drawTag(g, a, at);
     // Front people's bubbles first; anyone behind whose bubble would overlap is lifted above it.
-    const taken: { x: number; y: number; w: number; h: number }[] = [...tags];
-    for (const a of [...seen].reverse()) this.drawBubble(g, a, now, taken);
+    const taken: { x: number; y: number; w: number; h: number }[] = tags;
+    // Bubbles avoid every tag and every other person's face too.
+    const bubbles: { x: number; y: number; w: number; h: number }[] = [];
+    for (const a of [...seen].reverse()) {
+      const around = [...taken, ...bubbles, ...seen.filter((o) => o !== a).map((o) => this.headBox(o))];
+      const before = around.length;
+      this.drawBubble(g, a, now, around);
+      if (around.length > before) bubbles.push(around[around.length - 1]);
+    }
   }
 
   /** World px → CSS px on the canvas. */
@@ -1111,10 +1118,18 @@ export default class Stage {
     let x = cx - w / 2;
     x = Math.max(4, Math.min(this.cssW() - w - 4, x));
     let y = bottom - h;
-    for (let i = 0; i < 6; i++) {
-      const hit = taken.find((r) => x < r.x + r.w + 4 && x + w + 4 > r.x && y < r.y + r.h + 4 && y + h + 4 > r.y);
-      if (!hit) break;
-      y = hit.y - h - 6;
+    // Sideways first, then up, like the name tags.
+    const clash = (bx: number, by: number) => taken.find((r) => bx < r.x + r.w + 4 && bx + w + 4 > r.x && by < r.y + r.h + 4 && by + h + 4 > r.y);
+    const fitX = (bx: number) => Math.max(4, Math.min(this.cssW() - w - 4, bx));
+    let placed = false;
+    for (let lift = 0; lift < 8 && !placed; lift++) {
+      const by = bottom - h - lift * 18;
+      for (const dx of [0, -w / 3, w / 3, -(w * 2) / 3, (w * 2) / 3]) {
+        if (!clash(fitX(x + dx), by)) {
+          [x, y, placed] = [fitX(x + dx), by, true];
+          break;
+        }
+      }
     }
     // Never above the top of the stage: lower it over the head instead (the tail is dropped then).
     y = Math.max(4, y);
@@ -1150,13 +1165,13 @@ export default class Stage {
       g.fillStyle = '#ffffff';
       roundRect(g, x, y, w, h, 11);
       g.fill();
-      if (y + h >= bottom - 1) {
-        g.beginPath();
-        g.moveTo(cx - 6, bottom - 1);
-        g.lineTo(cx, bottom + 8);
-        g.lineTo(cx + 6, bottom - 1);
-        g.fill();
-      }
+      // The tail points from the bubble down to the speaker, wherever the bubble ended up.
+      const tx = Math.max(x + 12, Math.min(x + w - 12, cx));
+      g.beginPath();
+      g.moveTo(tx - 6, y + h - 1);
+      g.lineTo(cx, Math.min(bottom + 8, y + h + 10));
+      g.lineTo(tx + 6, y + h - 1);
+      g.fill();
       g.shadowColor = 'transparent';
       g.fillStyle = '#1a1d25';
     }
