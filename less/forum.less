@@ -33,7 +33,8 @@
   background: #0d0f15;
   border: 1px solid var(--control-bg);
   touch-action: none;
-  &-canvas { display: block; width: 100%; height: 100%; }
+  // Out of the flow, so the canvas's own size can never feed back into the layout.
+  &-canvas { display: block; position: absolute; inset: 0; width: 100%; height: 100%; }
   .LoadingIndicator-container { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #e9ebf1; }
   &-error { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 24px; text-align: center; color: #fde68a; font-weight: 600; }
   &-hint {
@@ -168,23 +169,43 @@ html:not(#x-hi) .HangoutBoard-list a { color: var(--control-color); font-weight:
   .HangoutMain { grid-template-columns: minmax(0, 1fr) 280px; }
 }
 
-// Phones: the room on top, emotes, the log, and the command bar fixed above
-// the keyboard and any bottom tab bar.
+// Phones: the Hangout fills exactly the screen you can see (fitPhone sets
+// --hangout-top and --hangout-height from visualViewport): the room on top,
+// feelings, the log, and the command bar at the bottom. The keyboard shrinks
+// it rather than scrolling the room away.
 @media (max-width: 767.98px) {
-  .HangoutHead { margin: 8px 0; &-title { font-size: 20px; } }
-  .HangoutMain { grid-template-columns: minmax(0, 1fr); gap: 10px; }
-  .HangoutStage { aspect-ratio: auto; height: ~"min(52vh, 440px)"; min-height: 300px; border-radius: 12px; }
-  .HangoutStage-hint { font-size: 11px; }
-  .HangoutSide { flex-direction: column-reverse; }
-  .HangoutLog { height: 46vh; }
-  .HangoutBar:not(.HangoutBar--guest) {
-    position: fixed; left: 0; right: 0; bottom: var(--hangout-bar-bottom, 0px); z-index: 30;
-    margin: 0; padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); background: var(--body-bg);
-    border-top: 1px solid var(--control-bg);
+  .Hangout-phone {
+    .HangoutApp {
+      position: fixed; left: 0; right: 0; z-index: 2;
+      top: var(--hangout-top, 52px); height: var(--hangout-height, 80vh);
+      display: flex; flex-direction: column; gap: 8px;
+      padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+      background: var(--body-bg); overflow: hidden;
+    }
+    .HangoutHead { margin: 0; flex: none; flex-wrap: nowrap; overflow: hidden; &-title { font-size: 18px; white-space: nowrap; } &-sub { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } }
+    .HangoutMain { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
+    .HangoutStageCol { flex: none; gap: 8px; width: 100%; min-width: 0; }
+    .HangoutEmotes { flex: none; }
+    .HangoutStage { aspect-ratio: auto; height: ~"max(150px, calc(var(--hangout-height, 600px) * 0.42))"; min-height: 0; border-radius: 12px; }
+    .HangoutStage-hint { font-size: 11px; }
+    .HangoutEmotes-button { min-height: 40px; padding: 0 14px; }
+    .HangoutSide { flex: 1 1 auto; min-height: 0; }
+    .HangoutLogPanel { flex: 1 1 auto; min-height: 0; padding: 8px 10px; }
+    .HangoutTabs { flex: none; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-bottom: 6px; &::-webkit-scrollbar { display: none; } }
+    .HangoutTab { flex: none; }
+    .HangoutLog { height: auto; flex: 1 1 auto; min-height: 0; }
+    .HangoutBar { flex: none; margin: 0; }
+    .HangoutBar-input.FormControl { font-size: 16px; }
+    .HangoutBar--guest { flex-wrap: wrap; gap: 8px; }
+    // The card and the board float over the whole Hangout, not just the small room.
+    .HangoutMember { position: fixed; left: 8px; right: 8px; top: calc(var(--hangout-top, 52px) + 8px); width: auto; max-height: calc(var(--hangout-height, 80vh) - 16px); z-index: 3; }
+    .Page { padding-bottom: 0; }
   }
-  .HangoutBar-input.FormControl { font-size: 16px; }
-  .App--hangout .HangoutPage { padding-bottom: calc(var(--hangout-bar-height, 60px) + 12px); }
-  .HangoutMember { left: 8px; right: 8px; top: 8px; width: auto; }
+  // Typing: the keyboard takes half the screen, so the title and the feelings make way.
+  .Hangout-phone.Hangout-typing {
+    .HangoutHead, .HangoutEmotes { display: none; }
+    .HangoutStage { height: ~"max(120px, calc(var(--hangout-height, 400px) * 0.4))"; }
+  }
 }
 
 // Phase two: channels, mail, the board.
@@ -212,3 +233,8 @@ html:not(#x-hi) .HangoutBoard-list a { color: var(--control-color); font-weight:
 }
 .HangoutBoard .HangoutBoard-meta .HangoutLinkButton { margin-left: 8px; }
 .HangoutLog > .HangoutMail:first-child { margin-top: 0; }
+
+// Phones: nothing scrolls behind the pinned Hangout.
+@media (max-width: 767.98px) {
+  html.Hangout-phone, html.Hangout-phone body { overflow: hidden; overscroll-behavior: none; }
+}

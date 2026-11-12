@@ -41,7 +41,6 @@ export default class HangoutPage extends Page {
   settled = false;
   hintGone = false;
   private tick: number | undefined;
-  private observer: ResizeObserver | undefined;
 
   oninit(vnode: Mithril.Vnode) {
     super.oninit(vnode);
@@ -87,12 +86,12 @@ export default class HangoutPage extends Page {
       if (new URLSearchParams(window.location.search).get('tab') === 'mail' && live.me) this.switchTab('mail');
     });
     document.addEventListener('keydown', this.keys);
-    this.observer = new ResizeObserver(() => this.liftBar());
-    const bar = vnode.dom.querySelector('.HangoutBar');
-    if (bar) this.observer.observe(bar);
-    window.visualViewport?.addEventListener('resize', this.liftBar);
-    window.addEventListener('resize', this.liftBar);
-    this.liftBar();
+    window.visualViewport?.addEventListener('resize', this.fitPhone);
+    window.visualViewport?.addEventListener('scroll', this.fitPhone);
+    window.addEventListener('resize', this.fitPhone);
+    document.addEventListener('focusin', this.fitSoon);
+    document.addEventListener('focusout', this.fitSoon);
+    this.fitPhone();
   }
 
   onremove(vnode: Mithril.VnodeDOM) {
@@ -101,29 +100,56 @@ export default class HangoutPage extends Page {
     this.stage?.destroy();
     clearInterval(this.tick);
     document.removeEventListener('keydown', this.keys);
-    this.observer?.disconnect();
-    window.visualViewport?.removeEventListener('resize', this.liftBar);
-    window.removeEventListener('resize', this.liftBar);
-    document.documentElement.style.removeProperty('--hangout-bar-bottom');
-    document.documentElement.style.removeProperty('--hangout-bar-height');
+    window.visualViewport?.removeEventListener('resize', this.fitPhone);
+    window.visualViewport?.removeEventListener('scroll', this.fitPhone);
+    window.removeEventListener('resize', this.fitPhone);
+    document.removeEventListener('focusin', this.fitSoon);
+    document.removeEventListener('focusout', this.fitSoon);
+    const root = document.documentElement;
+    ['--hangout-top', '--hangout-height'].forEach((v) => root.style.removeProperty(v));
+    root.classList.remove('Hangout-phone', 'Hangout-typing');
   }
 
+  /** On phones the Hangout fills the screen like an app; true while it does. */
+  phone = false;
+
   /**
-   * On phones the command bar is fixed to the bottom (sticky dies under any
-   * theme's overflow), above a bottom tab bar and above the keyboard.
+   * Phones: the Hangout is pinned (position: fixed) to exactly the part of the
+   * screen you can see, between the forum's top bar and the keyboard (or a
+   * bottom tab bar), sized from visualViewport. Opening the keyboard shrinks
+   * it instead of scrolling the room away, so you see the room while you
+   * type. (A page that scrolls under the keyboard leaves a gap on iOS, and
+   * sticky dies under any theme's overflow.) Desktops keep the normal page.
    */
-  liftBar = () => {
-    const tab = document.querySelector<HTMLElement>('.MobileTab-bar, .MobileTab');
-    let lift = tab && getComputedStyle(tab).position === 'fixed' && tab.offsetHeight ? tab.offsetHeight : 0;
-    const vv = window.visualViewport;
-    if (vv) {
-      const keyboard = window.innerHeight - vv.height - vv.offsetTop;
-      if (keyboard > 80) lift = keyboard;
+  fitPhone = () => {
+    const root = document.documentElement;
+    const phone = window.matchMedia('(max-width: 767.98px)').matches;
+    if (phone !== this.phone) {
+      this.phone = phone;
+      root.classList.toggle('Hangout-phone', phone);
+      if (!phone && this.live.tab === 'who') this.live.tab = 'room';
+      m.redraw();
     }
-    const bar = document.querySelector<HTMLElement>('.HangoutBar');
-    const root = document.documentElement.style;
-    root.setProperty('--hangout-bar-bottom', `${Math.max(0, lift)}px`);
-    root.setProperty('--hangout-bar-height', `${bar?.offsetHeight || 0}px`);
+    if (!phone) return;
+    const vv = window.visualViewport;
+    const viewH = vv ? vv.height : window.innerHeight;
+    const offset = vv ? vv.offsetTop : 0;
+    // The visible top bar on phones is #app-navigation; #header is the off-screen drawer.
+    const nav = document.querySelector<HTMLElement>('#app-navigation, .App-navigation');
+    const navRect = nav && getComputedStyle(nav).display !== 'none' ? nav.getBoundingClientRect() : null;
+    const top = Math.max(0, navRect && navRect.bottom > 0 && navRect.bottom < viewH / 2 ? navRect.bottom : 0);
+    const typing = document.activeElement?.classList.contains('HangoutBar-input') && viewH < window.innerHeight - 120;
+    const tab = document.querySelector<HTMLElement>('.MobileTab-bar, .MobileTab');
+    const tabH = !typing && tab && getComputedStyle(tab).position === 'fixed' ? tab.offsetHeight : 0;
+    root.classList.toggle('Hangout-typing', !!typing);
+    root.style.setProperty('--hangout-top', `${Math.round(offset + top)}px`);
+    root.style.setProperty('--hangout-height', `${Math.max(240, Math.round(viewH - top - tabH))}px`);
+  };
+
+  /** Focus changes settle after the keyboard animates; measure again then. */
+  fitSoon = () => {
+    this.fitPhone();
+    window.setTimeout(this.fitPhone, 350);
   };
 
   /** Arrow keys walk when you're not typing; Enter jumps to the command bar. */
@@ -162,7 +188,7 @@ export default class HangoutPage extends Page {
   }
 
   switchTab(tab: Tab) {
-    if (!this.live.logs[tab] && tab !== 'mail') tab = 'room';
+    if (!this.live.logs[tab] && tab !== 'mail' && tab !== 'who') tab = 'room';
     this.live.tab = tab;
     if (tab === 'mail') this.live.loadMail();
     else this.live.unread[tab] = 0;
@@ -259,7 +285,6 @@ export default class HangoutPage extends Page {
     // The first lines arrive at the bottom; after that, follow along only while the reader is at the bottom.
     this.scrollLog(this.stick || (!this.settled && !!this.live.logs[this.live.tab]?.length));
     if (this.live.logs[this.live.tab]?.length) this.settled = true;
-    this.liftBar();
   }
 
   view() {
@@ -269,35 +294,37 @@ export default class HangoutPage extends Page {
     return (
       <div className="HangoutPage-wrap">
         <PageStructure className="HangoutPage">
-          <div className="HangoutHead">
-            <h1 className="HangoutHead-title">{room ? room.name : tt('page.title')}</h1>
-            {room ? (
-              <span className="HangoutHead-sub">
-                {t('head.here', { count: here })}
-                {room.exits.length ? ' · ' + tt('head.doors', { doors: room.exits.map((e) => e.room || e.name).join(', ') }) : ''}
-              </span>
-            ) : null}
+          <div className="HangoutApp">
+            <div className="HangoutHead">
+              <h1 className="HangoutHead-title">{room ? room.name : tt('page.title')}</h1>
+              {room ? (
+                <span className="HangoutHead-sub">
+                  {t('head.here', { count: here })}
+                  {room.exits.length ? ' · ' + tt('head.doors', { doors: room.exits.map((e) => e.room || e.name).join(', ') }) : ''}
+                </span>
+              ) : null}
+            </div>
+            <div className="HangoutMain">
+              <section className="HangoutStageCol">
+                <div className={classList('HangoutStage', room?.look.outdoor && 'is-outdoor')}>
+                  <canvas className="HangoutStage-canvas" aria-label={tt('stage.label')} role="img" />
+                  {live.loading ? <LoadingIndicator /> : null}
+                  {live.error ? <div className="HangoutStage-error">{live.error}</div> : null}
+                  {this.card ? this.cardView(this.card) : null}
+                  {this.boardOpen ? this.boardView() : null}
+                  {room && (!live.me || (!this.walked && !this.hintGone)) ? (
+                    <span className="HangoutStage-hint">{t(live.me ? 'stage.hint' : 'stage.hint_guest')}</span>
+                  ) : null}
+                </div>
+                {live.me ? this.emotes() : null}
+              </section>
+              <aside className="HangoutSide">
+                {this.phone ? null : this.whoPanel()}
+                {this.logPanel()}
+              </aside>
+            </div>
+            {live.me ? this.bar() : live.state ? this.guestBar() : null}
           </div>
-          <div className="HangoutMain">
-            <section className="HangoutStageCol">
-              <div className={classList('HangoutStage', room?.look.outdoor && 'is-outdoor')}>
-                <canvas className="HangoutStage-canvas" aria-label={tt('stage.label')} role="img" />
-                {live.loading ? <LoadingIndicator /> : null}
-                {live.error ? <div className="HangoutStage-error">{live.error}</div> : null}
-                {this.card ? this.cardView(this.card) : null}
-                {this.boardOpen ? this.boardView() : null}
-                {room && (!live.me || (!this.walked && !this.hintGone)) ? (
-                  <span className="HangoutStage-hint">{t(live.me ? 'stage.hint' : 'stage.hint_guest')}</span>
-                ) : null}
-              </div>
-              {live.me ? this.emotes() : null}
-            </section>
-            <aside className="HangoutSide">
-              {this.whoPanel()}
-              {this.logPanel()}
-            </aside>
-          </div>
-          {live.me ? this.bar() : live.state ? this.guestBar() : null}
         </PageStructure>
       </div>
     );
@@ -402,7 +429,7 @@ export default class HangoutPage extends Page {
   logPanel() {
     const live = this.live;
     const chans = live.channels.filter((c) => c.in);
-    const tabs: Tab[] = live.me ? ['room', ...chans.map((c) => 'chan:' + c.id), 'tells', 'mail'] : ['room'];
+    const tabs: Tab[] = [...(live.me ? ['room', ...chans.map((c) => 'chan:' + c.id), 'tells', 'mail'] : ['room']), ...(this.phone ? ['who'] : [])];
     const label = (tab: Tab) => (tab.startsWith('chan:') ? '#' + (chans.find((c) => 'chan:' + c.id === tab)?.name || '') : t('tabs.' + tab));
     return (
       <div className="HangoutCard HangoutLogPanel">
@@ -421,7 +448,13 @@ export default class HangoutPage extends Page {
           ))}
         </div>
         <div className="HangoutLog" role="log" aria-live="polite">
-          {live.tab === 'mail' ? (
+          {live.tab === 'who' ? (
+            live.who.length ? (
+              WhoTable({ live, people: [...live.who].sort((a, b) => Number(live.friends.has(b.id)) - Number(live.friends.has(a.id))) })
+            ) : (
+              <p className="HangoutEmpty">{t('who.empty')}</p>
+            )
+          ) : live.tab === 'mail' ? (
             this.mailView()
           ) : live.logs[live.tab]?.length ? (
             live.logs[live.tab].map((line) => <div key={line.id}>{renderLine(live, line)}</div>)

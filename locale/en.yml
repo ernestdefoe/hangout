@@ -38,6 +38,7 @@ ernestdefoe-hangout:
       room_empty: It's quiet. Say hello!
       tells_empty: Pages and tells sent to you show up here. Try "tell name = hi".
       chan_empty: Nothing said on this channel since you came in.
+      who: Who's on
       mail: Mail
     card:
       close: Close
