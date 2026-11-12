@@ -9,7 +9,12 @@ namespace ErnestDefoe\Hangout;
  */
 final class Furniture
 {
-    /** kind => [w, h, solid, wall, light radius in tiles (0 = none), light colour, seat] */
+    /**
+     * kind => [w, h, solid, wall, light radius in tiles (0 = none), light colour, seat, rows kept clear in front]
+     *
+     * The last is for low, wide pieces (the fountain): someone standing right in
+     * front would seem to stand in it, since a person is taller than a tile.
+     */
     public const CATALOG = [
         'rug' => [6, 4, false, false, 0, '', false],
         'rug_neon' => [5, 3, false, false, 0, '', false],
@@ -33,7 +38,7 @@ final class Furniture
         'telescope' => [1, 1, true, false, 0, '', false],
         'hammock' => [3, 1, true, false, 0, '', true],
         'deckchair' => [1, 1, false, false, 0, '', true],
-        'fountain' => [2, 2, true, false, 2, '#a5f3fc', false],
+        'fountain' => [2, 2, true, false, 2, '#a5f3fc', false, 1],
         'board' => [4, 1, false, true, 0, '', false],
         'window' => [2, 1, false, true, 0, '', false],
         'painting' => [2, 1, false, true, 0, '', false],
@@ -58,10 +63,12 @@ final class Furniture
     {
         $blocked = [];
         foreach ($items as $item) {
-            [$w, $h, $solid, $wall] = self::CATALOG[$item->kind] ?? [1, 1, false, false];
+            $cat = self::CATALOG[$item->kind] ?? [1, 1, false, false];
+            [$w, $h, $solid, $wall] = $cat;
             if (! $solid || $wall) {
                 continue;
             }
+            $h += (int) ($cat[7] ?? 0);
             for ($dy = 0; $dy < $h; $dy++) {
                 for ($dx = 0; $dx < $w; $dx++) {
                     $blocked[((int) $item->y + $dy) * 256 + (int) $item->x + $dx] = true;

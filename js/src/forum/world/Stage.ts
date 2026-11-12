@@ -23,8 +23,8 @@ const PEOPLE = 1.22; // people are drawn a little larger than the furniture's sc
 const ART: { v: string; scale: number; frames: Record<string, number[]> } = atlasData as any;
 const A = ART.scale / T; // atlas px per world px
 
-/** Furniture footprints and light, mirroring Furniture::CATALOG on the server. */
-const CATALOG: Record<string, [number, number, boolean, boolean, number, string]> = {
+/** Furniture footprints and light, mirroring Furniture::CATALOG on the server (the 7th value: rows kept clear in front). */
+const CATALOG: Record<string, [number, number, boolean, boolean, number, string, number?]> = {
   rug: [6, 4, false, false, 0, ''],
   rug_neon: [5, 3, false, false, 0, ''],
   sofa: [3, 1, true, false, 0, ''],
@@ -47,7 +47,7 @@ const CATALOG: Record<string, [number, number, boolean, boolean, number, string]
   telescope: [1, 1, true, false, 0, ''],
   hammock: [3, 1, true, false, 0, ''],
   deckchair: [1, 1, false, false, 0, ''],
-  fountain: [2, 2, true, false, 2, '#a5f3fc'],
+  fountain: [2, 2, true, false, 2, '#a5f3fc', 1],
   board: [4, 1, false, true, 0, ''],
   window: [2, 1, false, true, 0, ''],
   painting: [2, 1, false, true, 0, ''],
@@ -128,6 +128,7 @@ export default class Stage {
   private font = 'system-ui, sans-serif';
   private target: { x: number; y: number; t: number } | null = null;
   private stopped = false;
+  private debugTiles = /[?&]debug=tiles\b/.test(window.location.search);
   private manualUntil = 0;
 
   constructor(
@@ -171,8 +172,9 @@ export default class Stage {
     this.zoom = 1;
     this.panX = this.panY = 0;
     for (const item of room.items) {
-      const [w, h, solid, wall] = CATALOG[item.k] || [1, 1, false, false];
+      const [w, h0, solid, wall, , , front] = CATALOG[item.k] || [1, 1, false, false];
       if (!solid || wall) continue;
+      const h = h0 + (front || 0);
       for (let dy = 0; dy < h; dy++) for (let dx = 0; dx < w; dx++) this.blocked.add((item.y + dy) * 256 + item.x + dx);
     }
     for (const p of room.people) this.add(p, false);
@@ -766,6 +768,18 @@ export default class Stage {
 
     this.drawLight(g, now);
 
+    // ?debug=tiles: blocked tiles in red and every footprint outlined, to check art against walking.
+    if (this.debugTiles) {
+      g.fillStyle = 'rgba(255,0,0,0.25)';
+      for (const k of this.blocked) g.fillRect((k % 256) * T, WALL + Math.floor(k / 256) * T, T, T);
+      g.strokeStyle = 'rgba(0,200,255,0.9)';
+      g.lineWidth = 2;
+      for (const item of r.items) {
+        const cat = CATALOG[item.k];
+        if (cat && !cat[3]) g.strokeRect(item.x * T, WALL + item.y * T, cat[0] * T, cat[1] * T);
+      }
+    }
+
     // Where we're walking to.
     if (this.target && now - this.target.t < 900) {
       const k = (now - this.target.t) / 900;
@@ -787,7 +801,7 @@ export default class Stage {
     });
     // Name tags: front people keep their place; a tag behind that would overlap is lifted clear of it.
     const tags: { x: number; y: number; w: number; h: number }[] = [];
-    const placed = [...seen].reverse().map((a) => ({ a, at: this.placeTag(g, a, tags) }));
+    const placed = [...seen].reverse().map((a) => ({ a, at: this.placeTag(g, a, tags, seen) }));
     for (const { a, at } of placed.reverse()) this.drawTag(g, a, at);
     // Front people's bubbles first; anyone behind whose bubble would overlap is lifted above it.
     const taken: { x: number; y: number; w: number; h: number }[] = [...tags];
@@ -993,20 +1007,43 @@ export default class Stage {
   }
 
   /** Where a name tag goes: over the head, or lifted above any tag already placed there. */
-  private placeTag(g: CanvasRenderingContext2D, a: Actor, taken: { x: number; y: number; w: number; h: number }[]) {
+  /** A person's head circle in CSS px (for keeping name tags off faces). */
+  private headBox(a: Actor) {
+    const r = ((14 * PEOPLE + 2) * this.scale) / this.dpr;
+    const cx = this.sx(a.x * T + T / 2);
+    const cy = this.sy(WALL + a.y * T + T * 0.8 - 50 * PEOPLE);
+    return { x: cx - r, y: cy - r, w: r * 2, h: r * 2 };
+  }
+
+  /**
+   * Where a name tag goes. Over its owner's head if that's clear; otherwise
+   * nudged sideways, and lifted only if no sideways spot fits. A tag never
+   * covers another tag or anyone else's face.
+   */
+  private placeTag(g: CanvasRenderingContext2D, a: Actor, taken: { x: number; y: number; w: number; h: number }[], others: Actor[]) {
     const { w } = this.tagSize(g, a);
     const h = 17;
-    const x = Math.max(2, Math.min(this.cssW() - w - 2, this.sx(a.x * T + T / 2) - w / 2));
+    const cx = this.sx(a.x * T + T / 2);
     const home = this.sy(WALL + a.y * T + T * 0.8 - 86) - 20 - (a.anim === 'dance' ? 4 : 0);
-    let y = home;
-    for (let i = 0; i < 5; i++) {
-      const hit = taken.find((r) => x < r.x + r.w + 2 && x + w + 2 > r.x && y < r.y + r.h + 2 && y + h + 2 > r.y);
-      if (!hit) break;
-      y = hit.y - h - 3;
+    const faces = others.filter((o) => o !== a).map((o) => this.headBox(o));
+    const clash = (x: number, y: number) =>
+      [...taken, ...faces].some((r) => x < r.x + r.w + 2 && x + w + 2 > r.x && y < r.y + r.h + 2 && y + h + 2 > r.y);
+    const fit = (x: number) => Math.max(2, Math.min(this.cssW() - w - 2, x));
+    let best: { x: number; y: number } | null = null;
+    for (let lift = 0; lift < 6 && !best; lift++) {
+      const y = Math.max(2, home - lift * (h + 3));
+      for (const dx of [0, -(w / 2 + 4), w / 2 + 4, -(w + 6), w + 6]) {
+        const x = fit(cx - w / 2 + dx);
+        if (!clash(x, y)) {
+          best = { x, y };
+          break;
+        }
+      }
     }
-    y = Math.max(2, y);
-    taken.push({ x, y, w, h });
-    return { x, y, home };
+    const at = best || { x: fit(cx - w / 2), y: Math.max(2, home - 6 * (h + 3)) };
+    taken.push({ ...at, w, h });
+    const head = this.headBox(a);
+    return { ...at, home, cx, headTop: head.y };
   }
 
   private tagSize(g: CanvasRenderingContext2D, a: Actor) {
@@ -1021,20 +1058,20 @@ export default class Stage {
     return { w: Math.ceil(nameW + rankW + 15), nameW, rank, showRank };
   }
 
-  private drawTag(g: CanvasRenderingContext2D, a: Actor, at: { x: number; y: number; home: number }) {
+  private drawTag(g: CanvasRenderingContext2D, a: Actor, at: { x: number; y: number; home: number; cx: number; headTop: number }) {
     const p = a.p;
     const { w, nameW, rank, showRank } = this.tagSize(g, a);
     const { x, y } = at;
     const me = p.id === this.hooks.meId;
     g.save();
     g.globalAlpha = Math.max(0, Math.min(1, a.fade));
-    // A lifted tag keeps a thin line down to its owner, so it's clear whose it is.
-    if (y < at.home - 4) {
-      const cx = this.sx(a.x * T + T / 2);
+    // A moved tag keeps a line to its owner's head, so it's clear whose it is.
+    const tx = x + w / 2;
+    if (y < at.home - 4 || Math.abs(tx - at.cx) > 6) {
       g.lineCap = 'round';
       g.beginPath();
-      g.moveTo(cx, y + 17);
-      g.lineTo(cx, at.home + 14);
+      g.moveTo(tx, y + 17);
+      g.lineTo(at.cx, at.headTop - 1);
       g.strokeStyle = 'rgba(18,20,26,0.85)';
       g.lineWidth = 3.5;
       g.stroke();
