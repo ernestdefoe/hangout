@@ -245,10 +245,19 @@ export default class HangoutPage extends Page {
     if (force || near) log.scrollTop = log.scrollHeight;
   }
 
+  /** Whether the log was at its newest line before this redraw: then it follows along however many lines arrive. */
+  stick = true;
+
+  onbeforeupdate(vnode: Mithril.Vnode<any, this>) {
+    const log = document.querySelector<HTMLElement>('.HangoutLog');
+    this.stick = !log || log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+    return super.onbeforeupdate(vnode);
+  }
+
   onupdate(vnode: Mithril.VnodeDOM) {
     super.onupdate?.(vnode);
     // The first lines arrive at the bottom; after that, follow along only while the reader is at the bottom.
-    this.scrollLog(!this.settled && !!this.live.logs[this.live.tab]?.length);
+    this.scrollLog(this.stick || (!this.settled && !!this.live.logs[this.live.tab]?.length));
     if (this.live.logs[this.live.tab]?.length) this.settled = true;
     this.liftBar();
   }

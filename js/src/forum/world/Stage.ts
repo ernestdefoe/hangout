@@ -745,7 +745,9 @@ export default class Stage {
       return x > -T / 2 && x < this.cssW() + T / 2;
     });
     for (const a of seen) this.drawTag(g, a, now);
-    for (const a of seen) this.drawBubble(g, a, now);
+    // Front people's bubbles first; anyone behind whose bubble would overlap is lifted above it.
+    const taken: { x: number; y: number; w: number; h: number }[] = [];
+    for (const a of [...seen].reverse()) this.drawBubble(g, a, now, taken);
   }
 
   /** World px → CSS px on the canvas. */
@@ -976,7 +978,7 @@ export default class Stage {
     void now;
   }
 
-  private drawBubble(g: CanvasRenderingContext2D, a: Actor, now: number) {
+  private drawBubble(g: CanvasRenderingContext2D, a: Actor, now: number, taken: { x: number; y: number; w: number; h: number }[]) {
     const b = a.bubble;
     if (!b) return;
     const age = now - b.born;
@@ -992,7 +994,13 @@ export default class Stage {
     const bottom = this.sy(WALL + a.y * T + T * 0.8 - 86) - 28 - (now - b.born < 400 ? (1 - pop) * 6 : 0);
     let x = cx - w / 2;
     x = Math.max(4, Math.min(this.cssW() - w - 4, x));
-    const y = bottom - h;
+    let y = bottom - h;
+    for (let i = 0; i < 4; i++) {
+      const hit = taken.find((r) => x < r.x + r.w + 4 && x + w + 4 > r.x && y < r.y + r.h + 4 && y + h + 4 > r.y);
+      if (!hit) break;
+      y = hit.y - h - 6;
+    }
+    taken.push({ x, y, w, h });
     g.save();
     g.globalAlpha = alpha;
     g.translate(cx, bottom);
@@ -1024,11 +1032,13 @@ export default class Stage {
       g.fillStyle = '#ffffff';
       roundRect(g, x, y, w, h, 11);
       g.fill();
-      g.beginPath();
-      g.moveTo(cx - 6, bottom - 1);
-      g.lineTo(cx, bottom + 8);
-      g.lineTo(cx + 6, bottom - 1);
-      g.fill();
+      if (y + h >= bottom - 1) {
+        g.beginPath();
+        g.moveTo(cx - 6, bottom - 1);
+        g.lineTo(cx, bottom + 8);
+        g.lineTo(cx + 6, bottom - 1);
+        g.fill();
+      }
       g.shadowColor = 'transparent';
       g.fillStyle = '#1a1d25';
     }
