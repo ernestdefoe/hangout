@@ -57,7 +57,7 @@
 .HangoutBar {
   display: flex; gap: 8px; align-items: center; margin-top: 12px;
   &-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-  &-input.FormControl { flex: 1; min-width: 0; height: 44px; font-size: 15px; }
+  &-input.FormControl { flex: 1; min-width: 0; height: 44px; font-size: 15px; resize: none; overflow-y: auto; line-height: 1.5; padding-top: 10px; padding-bottom: 10px; }
   &-send { height: 44px; flex: none; }
   &--guest { justify-content: space-between; padding: 12px 14px; border-radius: 12px; background: var(--control-bg); color: var(--control-color); font-weight: 600; }
 }

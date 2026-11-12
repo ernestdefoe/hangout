@@ -139,7 +139,8 @@ export default class HangoutPage extends Page {
     // The visible top bar on phones is #app-navigation; #header is the off-screen drawer.
     const nav = document.querySelector<HTMLElement>('#app-navigation, .App-navigation');
     const navRect = nav && getComputedStyle(nav).display !== 'none' ? nav.getBoundingClientRect() : null;
-    const top = Math.max(0, navRect && navRect.bottom > 0 && navRect.bottom < viewH / 2 ? navRect.bottom : 0);
+    // Where the top bar ends inside what you can see: iOS scrolls it away while typing, Android keeps it.
+    const top = Math.max(0, navRect && navRect.bottom - offset > 0 && navRect.bottom - offset < viewH / 2 ? navRect.bottom - offset : 0);
     // The keyboard is up when a field has focus and the view is well short of the tallest
     // it has been (iOS 26 Safari shrinks innerHeight too, so innerHeight can't be the baseline).
     const focused = /INPUT|TEXTAREA/.test(document.activeElement?.tagName || '');
@@ -148,10 +149,8 @@ export default class HangoutPage extends Page {
     const tab = document.querySelector<HTMLElement>('.MobileTab-bar, .MobileTab');
     const tabH = !typing && tab && getComputedStyle(tab).position === 'fixed' ? tab.offsetHeight : 0;
     root.classList.toggle('Hangout-typing', typing);
-    // Typing: the whole visible area (the top bar has scrolled away with the page). Otherwise: below the top bar.
-    const from = typing ? 0 : top;
-    root.style.setProperty('--hangout-top', `${Math.round(offset + from)}px`);
-    root.style.setProperty('--hangout-height', `${Math.max(200, Math.round(viewH - from - tabH))}px`);
+    root.style.setProperty('--hangout-top', `${Math.round(offset + top)}px`);
+    root.style.setProperty('--hangout-height', `${Math.max(200, Math.round(viewH - top - tabH))}px`);
   };
 
   /** Focus changes settle after the keyboard animates; measure again then. */
@@ -169,7 +168,7 @@ export default class HangoutPage extends Page {
       e.preventDefault();
       this.stage?.step(...dirs[e.key]);
     } else if (e.key === 'Enter' || e.key === '/') {
-      const input = document.querySelector<HTMLInputElement>('.HangoutBar-input');
+      const input = document.querySelector<HTMLTextAreaElement>('.HangoutBar-input');
       if (input) {
         e.preventDefault();
         input.focus();
@@ -370,18 +369,24 @@ export default class HangoutPage extends Page {
         <label className="HangoutBar-label" htmlFor="hangout-say">
           {t('bar.label')}
         </label>
-        <input
+        {/* A one-line textarea, not an input: Android Chrome hangs its autofill strip (keys, cards,
+            addresses) over the page above the keyboard for inputs, covering the bar. Enter still sends. */}
+        <textarea
           id="hangout-say"
           className="FormControl HangoutBar-input"
-          type="text"
+          rows={1}
           autocomplete="off"
+          autocapitalize="sentences"
           enterkeyhint="send"
           maxlength={500}
           placeholder={tt('bar.placeholder', { room: this.live.room?.name || '' })}
           value={this.input}
-          oninput={(e: InputEvent) => (this.input = (e.target as HTMLInputElement).value)}
+          oninput={(e: InputEvent) => (this.input = (e.target as HTMLTextAreaElement).value.replace(/\n/g, ' '))}
           onkeydown={(e: KeyboardEvent) => {
-            if (e.key === 'ArrowUp' && this.history.length) {
+            if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+              e.preventDefault();
+              this.send();
+            } else if (e.key === 'ArrowUp' && this.history.length) {
               e.preventDefault();
               this.historyAt = Math.min(this.history.length - 1, this.historyAt + 1);
               this.input = this.history[this.historyAt];
@@ -632,7 +637,7 @@ export default class HangoutPage extends Page {
     this.input = text;
     this.card = null;
     this.cardId = null;
-    requestAnimationFrame(() => document.querySelector<HTMLInputElement>('.HangoutBar-input')?.focus());
+    requestAnimationFrame(() => document.querySelector<HTMLTextAreaElement>('.HangoutBar-input')?.focus());
   }
 
   boardView() {
