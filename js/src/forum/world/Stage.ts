@@ -739,8 +739,13 @@ export default class Stage {
     g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     const sorted = [...this.actors.values()].sort((p, q) => p.y - q.y);
     for (const e of r.exits) this.drawDoorLabel(g, e);
-    for (const a of sorted) this.drawTag(g, a, now);
-    for (const a of sorted) this.drawBubble(g, a, now);
+    // Only people in view: a tag held at the edge for someone off camera would float with nobody under it.
+    const seen = sorted.filter((a) => {
+      const x = this.sx(a.x * T + T / 2);
+      return x > -T / 2 && x < this.cssW() + T / 2;
+    });
+    for (const a of seen) this.drawTag(g, a, now);
+    for (const a of seen) this.drawBubble(g, a, now);
   }
 
   /** World px → CSS px on the canvas. */
