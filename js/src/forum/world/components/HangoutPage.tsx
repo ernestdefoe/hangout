@@ -112,6 +112,8 @@ export default class HangoutPage extends Page {
 
   /** On phones the Hangout fills the screen like an app; true while it does. */
   phone = false;
+  /** The tallest the visible area has been with no field focused: the keyboard-closed height. */
+  fullH = 0;
 
   /**
    * Phones: the Hangout is pinned (position: fixed) to exactly the part of the
@@ -138,12 +140,18 @@ export default class HangoutPage extends Page {
     const nav = document.querySelector<HTMLElement>('#app-navigation, .App-navigation');
     const navRect = nav && getComputedStyle(nav).display !== 'none' ? nav.getBoundingClientRect() : null;
     const top = Math.max(0, navRect && navRect.bottom > 0 && navRect.bottom < viewH / 2 ? navRect.bottom : 0);
-    const typing = document.activeElement?.classList.contains('HangoutBar-input') && viewH < window.innerHeight - 120;
+    // The keyboard is up when a field has focus and the view is well short of the tallest
+    // it has been (iOS 26 Safari shrinks innerHeight too, so innerHeight can't be the baseline).
+    const focused = /INPUT|TEXTAREA/.test(document.activeElement?.tagName || '');
+    this.fullH = focused ? Math.max(this.fullH, viewH) : viewH;
+    const typing = focused && viewH < this.fullH - 120;
     const tab = document.querySelector<HTMLElement>('.MobileTab-bar, .MobileTab');
     const tabH = !typing && tab && getComputedStyle(tab).position === 'fixed' ? tab.offsetHeight : 0;
-    root.classList.toggle('Hangout-typing', !!typing);
-    root.style.setProperty('--hangout-top', `${Math.round(offset + top)}px`);
-    root.style.setProperty('--hangout-height', `${Math.max(240, Math.round(viewH - top - tabH))}px`);
+    root.classList.toggle('Hangout-typing', typing);
+    // Typing: the whole visible area (the top bar has scrolled away with the page). Otherwise: below the top bar.
+    const from = typing ? 0 : top;
+    root.style.setProperty('--hangout-top', `${Math.round(offset + from)}px`);
+    root.style.setProperty('--hangout-height', `${Math.max(200, Math.round(viewH - from - tabH))}px`);
   };
 
   /** Focus changes settle after the keyboard animates; measure again then. */
