@@ -37,6 +37,9 @@ class CardController extends Controller
         $card['description'] = $profile->description ?? null;
         $card['total'] = (int) ($profile->total_seconds ?? 0) + ($presence ? time() - strtotime((string) $presence->connected_at) : 0);
         $card['joined'] = $user->joined_at?->getTimestamp();
+        if ($profile?->partner_id && $profile->partner_state === 'married') {
+            $card['partner'] = User::query()->find((int) $profile->partner_id)?->display_name;
+        }
         $card['room'] = $presence ? $this->world->room((int) $presence->room_id)?->name : null;
 
         $post = CommentPost::query()->whereVisibleTo($actor)->where('user_id', $id)->where('type', 'comment')

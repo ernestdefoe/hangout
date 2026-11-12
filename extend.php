@@ -16,11 +16,14 @@
 use ErnestDefoe\Hangout\Access;
 use ErnestDefoe\Hangout\Api;
 use ErnestDefoe\Hangout\Console\PruneCommand;
+use ErnestDefoe\Hangout\HangoutServiceProvider;
 use ErnestDefoe\Hangout\Http\PageContent;
+use ErnestDefoe\Hangout\Notification\MailBlueprint;
 use Flarum\Api\Context;
 use Flarum\Api\Resource\ForumResource;
 use Flarum\Api\Schema;
 use Flarum\Extend;
+use Flarum\User\Event\Deleted;
 
 return [
     (new Extend\Frontend('forum'))
@@ -43,7 +46,22 @@ return [
         ->post('/hangout/leave', 'hangout.leave', Api\LeaveController::class)
         ->get('/hangout/who', 'hangout.who', Api\WhoController::class)
         ->get('/hangout/people/{id:\d+}', 'hangout.card', Api\CardController::class)
-        ->get('/hangout/art', 'hangout.art', Api\AtlasController::class),
+        ->get('/hangout/art', 'hangout.art', Api\AtlasController::class)
+        ->get('/hangout/mail', 'hangout.mail', Api\MailController::class)
+        ->get('/hangout/bbs', 'hangout.bbs', Api\BbsController::class)
+        ->post('/hangout/bbs', 'hangout.bbs.write', Api\BbsController::class),
+
+    (new Extend\ServiceProvider())
+        ->register(HangoutServiceProvider::class),
+
+    (new Extend\Notification())
+        ->type(MailBlueprint::class, ['alert']),
+
+    // A deleted member's partner is single again (the other tables cascade).
+    (new Extend\Event())
+        ->listen(Deleted::class, function (Deleted $event) {
+            resolve('db')->table('hangout_profiles')->where('partner_id', $event->user->id)->update(['partner_id' => null, 'partner_state' => null]);
+        }),
 
     // The viewer's own permission: already loaded, so no query.
     (new Extend\ApiResource(ForumResource::class))

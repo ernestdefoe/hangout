@@ -49,10 +49,37 @@ final class Commands
     ) {
     }
 
+    /** @var (callable(User, string): ?string)|null */
+    private $expander = null;
+
+    /** @var (callable(int, int[]): int[])|null */
+    private $blocker = null;
+
+    /** @var (callable(int, string): ?array<int, int>)|null */
+    private $grouper = null;
+
     /** @param callable(Ctx, string): void $handler */
     public function register(string $word, callable $handler): void
     {
         $this->extra[$word] = $handler;
+    }
+
+    /** Aliases: a word that stands for a longer command. */
+    public function expandWith(callable $expander): void
+    {
+        $this->expander = $expander;
+    }
+
+    /** Who refuses pages and tells from someone (their enemies). */
+    public function blockWith(callable $blocker): void
+    {
+        $this->blocker = $blocker;
+    }
+
+    /** Named groups of people to page at once ('friends'). */
+    public function groupWith(callable $grouper): void
+    {
+        $this->grouper = $grouper;
     }
 
     public function run(User $actor, string $line): Ctx
@@ -68,6 +95,11 @@ final class Commands
         }
         $this->world->touch($actor, $presence);
         [$word, $args] = $this->split($line);
+        // One alias expansion, TCZ style: the rest of the line is added to the end.
+        if (! isset(self::WORDS[$word]) && $this->expander && ($alias = ($this->expander)($actor, $word))) {
+            [$word, $more] = $this->split($alias);
+            $args = trim($more.' '.$args);
+        }
 
         if (isset($this->extra[$word])) {
             ($this->extra[$word])($ctx, $args);
@@ -229,6 +261,17 @@ final class Commands
             throw new HangoutException('usage', 422, ['usage' => $kind.' <name>[,<name>] [=] <message>']);
         }
         $targets = [];
+        $group = $this->grouper ? ($this->grouper)((int) $ctx->actor->id, strtolower(trim($who))) : null;
+        if ($group !== null) {
+            $ids = $this->db->table('hangout_presence')->whereIn('user_id', $group ?: [0])->where('invisible', false)->pluck('user_id')->all();
+            foreach ($ids ? User::query()->whereIn('id', $ids)->get() : [] as $user) {
+                $targets[(int) $user->id] = $user;
+            }
+            if (! $targets) {
+                throw new HangoutException('no_friends_on', 404);
+            }
+            $who = '';
+        }
         foreach (array_filter(array_map('trim', explode(',', $who))) as $name) {
             $user = match (true) {
                 (bool) preg_match('/^#(\d+)$/', $name, $m) => $this->find($m[1]),
@@ -241,6 +284,15 @@ final class Commands
             $targets[(int) $user->id] = $user;
         }
         $targets = array_slice($targets, 0, 25, true);
+        // TCZ: an enemy's pages and tells never arrive.
+        if ($this->blocker && ($blocked = ($this->blocker)((int) $ctx->actor->id, array_keys($targets)))) {
+            foreach ($blocked as $id) {
+                unset($targets[$id]);
+            }
+            if (! $targets) {
+                throw new HangoutException('blocked', 403, ['name' => '']);
+            }
+        }
         // Morons may only page staff (TCZ: Apprentice Wizards/Druids and above).
         if (! Ranks::can($ctx->rank, 'page_anyone')) {
             foreach ($this->ranks->ofMany(array_keys($targets)) as $rank) {

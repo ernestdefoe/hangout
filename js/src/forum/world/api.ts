@@ -81,12 +81,17 @@ export interface State {
   ranks: Record<string, Rank>;
   feelings: string[];
   head: number;
-  can: { talk: boolean; shout: boolean; staff: boolean; invisible: boolean };
+  can: { talk: boolean; shout: boolean; staff: boolean; invisible: boolean; channels: boolean };
   rank: string;
   idle: number;
   tz: number;
   push: boolean;
   now: number;
+  channels: { id: number; name: string; description: string | null; n: number; in: boolean }[];
+  friends: number[];
+  enemies: number[];
+  mail: number;
+  chanlog?: HEvent[];
 }
 
 export const t = (key: string, params: Record<string, any> = {}) => app.translator.trans('ernestdefoe-hangout.forum.' + key, params);

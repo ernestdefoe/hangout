@@ -186,3 +186,29 @@ html:not(#x-hi) .HangoutBoard-list a { color: var(--control-color); font-weight:
   .App--hangout .HangoutPage { padding-bottom: calc(var(--hangout-bar-height, 60px) + 12px); }
   .HangoutMember { left: 8px; right: 8px; top: 8px; width: auto; }
 }
+
+// Phase two: channels, mail, the board.
+.HangoutLine-chan { font-size: 11px; font-weight: 700; color: var(--muted-color); }
+.HangoutWho-friend { color: var(--primary-color); }
+.HangoutList { list-style: none; margin: 4px 0; padding: 0; li { margin: 3px 0; } }
+.HangoutWord.is-active { background: var(--text-color); color: var(--body-bg); }
+.HangoutMail {
+  display: flex; flex-direction: column; gap: 6px;
+  &-item {
+    border-radius: 8px; padding: 6px 8px; background: var(--control-bg); color: var(--control-color);
+    summary { cursor: pointer; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+    &.is-unread summary strong::before { content: '● '; color: var(--primary-color); }
+  }
+  &-subject { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  &-body { margin: 6px 0; white-space: pre-line; color: var(--text-color); }
+  &-actions { display: flex; gap: 12px; .HangoutLinkButton { margin-left: 0; } }
+}
+.HangoutBbs {
+  display: flex; flex-direction: column; gap: 8px;
+  &-form { display: flex; flex-direction: column; gap: 6px; textarea { resize: vertical; } }
+  &-actions { display: flex; gap: 8px; }
+  &-subject { color: var(--control-color); }
+  &-body { font-size: 13px; color: var(--text-color); white-space: pre-line; overflow-wrap: anywhere; }
+}
+.HangoutBoard .HangoutBoard-meta .HangoutLinkButton { margin-left: 8px; }
+.HangoutLog > .HangoutMail:first-child { margin-top: 0; }

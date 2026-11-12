@@ -7,6 +7,7 @@ use ErnestDefoe\Hangout\Events;
 use ErnestDefoe\Hangout\Feelings;
 use ErnestDefoe\Hangout\Ranks;
 use ErnestDefoe\Hangout\Settings;
+use ErnestDefoe\Hangout\Social;
 use ErnestDefoe\Hangout\World;
 use Flarum\User\User;
 use Illuminate\Support\Arr;
@@ -24,6 +25,7 @@ class StateController extends Controller
         private readonly Events $events,
         private readonly Ranks $ranks,
         private readonly Settings $settings,
+        private readonly Social $social,
     ) {
     }
 
@@ -57,10 +59,16 @@ class StateController extends Controller
                 'shout' => $talk && $actor->can(Settings::SHOUT) && Ranks::can($rank, 'shout'),
                 'staff' => $talk && Ranks::can($rank, 'staff'),
                 'invisible' => $talk && Ranks::can($rank, 'invisible'),
+                'channels' => $talk && ($actor->can('ernestdefoe-hangout.createChannels') || Ranks::can($rank, 'staff')),
             ],
             'rank' => $rank,
             'idle' => $this->settings->idleMinutes() * 60,
             'tz' => $tz->getOffset(new \DateTimeImmutable('now', $tz)),
+            'channels' => $talk ? $this->social->channels((int) $actor->id) : [],
+            'chanlog' => $talk ? $this->events->recentChannels($this->social->channelIds((int) $actor->id)) : [],
+            'friends' => $talk ? $this->social->ids((int) $actor->id, 'friend') : [],
+            'enemies' => $talk ? $this->social->ids((int) $actor->id, 'enemy') : [],
+            'mail' => $talk ? $this->social->unread((int) $actor->id) : 0,
             'push' => class_exists(\Pusher\Pusher::class) && resolve('container')->bound(\Pusher\Pusher::class),
         ];
     }

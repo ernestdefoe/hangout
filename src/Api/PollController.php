@@ -4,6 +4,7 @@ namespace ErnestDefoe\Hangout\Api;
 
 use ErnestDefoe\Hangout\Access;
 use ErnestDefoe\Hangout\Events;
+use ErnestDefoe\Hangout\Social;
 use ErnestDefoe\Hangout\World;
 use Flarum\User\User;
 use Illuminate\Support\Arr;
@@ -22,6 +23,7 @@ class PollController extends Controller
     public function __construct(
         private readonly World $world,
         private readonly Events $events,
+        private readonly Social $social,
     ) {
     }
 
@@ -63,9 +65,9 @@ class PollController extends Controller
         ];
     }
 
-    /** @return int[] channels the reader is in (none until channels exist) */
+    /** @return int[] channels the reader is in (cached) */
     protected function channels(?int $userId): array
     {
-        return [];
+        return $userId ? $this->social->channelIds($userId) : [];
     }
 }

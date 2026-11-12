@@ -1,5 +1,5 @@
 import app from 'flarum/forum/app';
-import { call, errorText, type HEvent, type Person, type RoomState, type State } from './api';
+import { call, errorText, tt, type HEvent, type Person, type RoomState, type State } from './api';
 import type Stage from './Stage';
 
 /**
@@ -19,7 +19,8 @@ const SAFETY = 20000;
 const HIDDEN = 20000;
 const KEEP = 250;
 
-export type Tab = 'room' | 'tells';
+/** room, tells, mail, or chan:<id> for a channel. */
+export type Tab = string;
 
 export interface Line {
   /** An event from the log… */
@@ -27,6 +28,24 @@ export interface Line {
   /** …or a private answer to a command ({k: locale key, …params}). */
   out?: Record<string, any>;
   id: number;
+}
+
+export interface Channel {
+  id: number;
+  name: string;
+  description: string | null;
+  n: number;
+  in: boolean;
+}
+
+export interface Mail {
+  id: number;
+  from: string;
+  fromU: string;
+  subject: string;
+  body: string;
+  read: boolean;
+  at: number;
 }
 
 let lineId = 0;
@@ -37,7 +56,11 @@ export default class Live {
   people = new Map<number, Person>();
   who: Person[] = [];
   logs: Record<Tab, Line[]> = { room: [], tells: [] };
-  unread: Record<Tab, number> = { room: 0, tells: 0 };
+  unread: Record<Tab, number> = { room: 0, tells: 0, mail: 0 };
+  channels: Channel[] = [];
+  friends = new Set<number>();
+  enemies = new Set<number>();
+  mail: Mail[] | null = null;
   tab: Tab = 'room';
   error: string | null = null;
   loading = true;
@@ -69,6 +92,16 @@ export default class Live {
       this.state = state;
       this.upto = state.head;
       this.error = null;
+      this.setChannels(state.channels || []);
+      for (const e of state.chanlog || []) {
+        if (e.h && this.logs['chan:' + e.h] && !this.seen.has(e.i)) {
+          this.seen.add(e.i);
+          this.logs['chan:' + e.h].push({ e, id: ++lineId });
+        }
+      }
+      this.friends = new Set(state.friends || []);
+      this.enemies = new Set(state.enemies || []);
+      this.unread.mail = state.mail || 0;
       this.enterRoom(state.room, false);
       this.bindRealtime();
       this.loadWho();
@@ -154,7 +187,24 @@ export default class Live {
     m.redraw();
   }
 
+  setChannels(list: Channel[]) {
+    this.channels = list;
+    for (const c of list) if (c.in && !this.logs['chan:' + c.id]) this.logs['chan:' + c.id] = [];
+    if (this.tab.startsWith('chan:') && !list.find((c) => c.in && 'chan:' + c.id === this.tab)) this.tab = 'room';
+  }
+
+  async loadMail() {
+    try {
+      this.mail = (await call<{ mail: Mail[] }>('GET', '/mail')).mail;
+      this.unread.mail = this.mail.filter((x) => !x.read).length;
+    } catch {
+      this.mail = this.mail || [];
+    }
+    m.redraw();
+  }
+
   print(out: Record<string, any>, tab: Tab = this.tab) {
+    if (!this.logs[tab]) tab = 'room';
     this.logs[tab].push({ out, id: ++lineId });
     this.trim(tab);
   }
@@ -240,6 +290,8 @@ export default class Live {
     const d = e.d || {};
     const stage = this.stage;
     let log: Tab | null = null;
+    // An enemy's talk never shows (they still come and go).
+    const ignored = !!e.a && !mine && this.enemies.has(e.a);
 
     switch (e.k) {
       case 'move':
@@ -270,6 +322,8 @@ export default class Live {
           this.people.set(d.p.id, d.p);
           stage?.add(d.p);
         }
+        // TCZ pings you when a friend connects.
+        if (e.a && this.friends.has(e.a) && !mine) app.alerts.show({ type: 'success' } as any, tt('alerts.friend_on', { name: d.p?.n || '' }));
         log = 'room';
         this.whoSoon();
         break;
@@ -291,12 +345,13 @@ export default class Live {
       case 'say':
       case 'emote':
       case 'think':
-        if (!here) return;
+        if (!here || ignored) return;
         if (e.a) stage?.bubble(e.a, e.k === 'emote' ? `${d.n} ${e.t}` : e.t || '', e.k === 'think');
         if (e.a) this.touch(e.a);
         log = 'room';
         break;
       case 'feel':
+        if (ignored) return;
         if (here && e.a) {
           stage?.bubble(e.a, mine ? d.u : e.t || '');
           stage?.animate(e.a, d.f);
@@ -313,6 +368,23 @@ export default class Live {
           log = 'room';
         }
         break;
+      case 'chan':
+        if (ignored || !e.h || !this.logs['chan:' + e.h]) return;
+        log = 'chan:' + e.h;
+        break;
+      case 'shout':
+      case 'yell':
+        if (ignored) return;
+        if (here && e.a) stage?.bubble(e.a, e.t || '');
+        log = 'room';
+        break;
+      case 'partner':
+        log = 'room';
+        break;
+      case 'propose':
+        log = 'tells';
+        if (!mine) app.alerts.show({ type: 'info' } as any, tt('alerts.proposal', { name: d.n }));
+        break;
       case 'page':
       case 'tell':
       case 'remote':
@@ -325,7 +397,7 @@ export default class Live {
     if (!log) return;
     this.logs[log].push({ e, id: ++lineId });
     this.trim(log);
-    if (log !== this.tab && !mine) this.unread[log]++;
+    if (log !== this.tab && !mine) this.unread[log] = (this.unread[log] || 0) + 1;
   }
 
   /** Someone did something: they're not idle any more. */

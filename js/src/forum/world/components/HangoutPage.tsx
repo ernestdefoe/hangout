@@ -4,7 +4,7 @@ import Button from 'flarum/common/components/Button';
 import LoadingIndicator from 'flarum/common/components/LoadingIndicator';
 import classList from 'flarum/common/utils/classList';
 import type Mithril from 'mithril';
-import { call, duration, fullName, idle, t, tt, type Exit, type Person } from '../api';
+import { call, duration, errorText, fullName, idle, t, tt, type Exit, type Person } from '../api';
 import Live, { type Tab } from '../Live';
 import Stage from '../Stage';
 import { linkify, renderLine, WhoTable } from './lines';
@@ -17,6 +17,7 @@ interface Card extends Person {
   total?: number;
   joined?: number;
   post?: { excerpt: string; discussion: string; did: number; number: number };
+  partner?: string;
 }
 
 /** /hangout: the room, the command bar, who's on, and the logs. */
@@ -29,6 +30,11 @@ export default class HangoutPage extends Page {
   card: Card | null = null;
   cardId: number | null = null;
   board: any[] | null = null;
+  bbs: { topics: any[]; topic: number; messages: any[] } | null = null;
+  boardTab: 'bbs' | 'newest' = 'bbs';
+  writing = false;
+  posting = false;
+  note = { subject: '', body: '' };
   boardOpen = false;
   sending = false;
   walked = false;
@@ -77,7 +83,9 @@ export default class HangoutPage extends Page {
       },
     });
     live.stage = this.stage;
-    live.start();
+    live.start().then(() => {
+      if (new URLSearchParams(window.location.search).get('tab') === 'mail' && live.me) this.switchTab('mail');
+    });
     document.addEventListener('keydown', this.keys);
     this.observer = new ResizeObserver(() => this.liftBar());
     const bar = vnode.dom.querySelector('.HangoutBar');
@@ -142,14 +150,22 @@ export default class HangoutPage extends Page {
 
   ui(ui: Record<string, any>) {
     if (ui.card) this.openCard(ui.card);
+    if (ui.channels) this.live.setChannels(ui.channels);
+    if (ui.relations) {
+      this.live.friends = new Set(ui.relations.friends);
+      this.live.enemies = new Set(ui.relations.enemies);
+    }
+    if (ui.board) this.openBoard();
     if (ui.tab) this.switchTab(ui.tab);
     if (ui.quit) m.route.set(app.route('index'));
     m.redraw();
   }
 
   switchTab(tab: Tab) {
+    if (!this.live.logs[tab] && tab !== 'mail') tab = 'room';
     this.live.tab = tab;
-    this.live.unread[tab] = 0;
+    if (tab === 'mail') this.live.loadMail();
+    else this.live.unread[tab] = 0;
     requestAnimationFrame(() => this.scrollLog(true));
   }
 
@@ -167,16 +183,43 @@ export default class HangoutPage extends Page {
     m.redraw();
   }
 
-  async openBoard() {
+  async openBoard(topic?: number) {
     this.boardOpen = true;
     this.card = null;
     m.redraw();
     try {
-      this.board = (await app.store.find<any>('discussions', { sort: '-createdAt', page: { limit: 6 } } as any)) as any;
+      const [bbs, newest] = await Promise.all([
+        call<any>('GET', '/bbs', topic ? { topic: String(topic) } : undefined),
+        this.board ? Promise.resolve(this.board) : app.store.find<any>('discussions', { sort: '-createdAt', page: { limit: 6 } } as any),
+      ]);
+      this.bbs = bbs;
+      this.board = newest as any;
     } catch {
-      this.board = [];
+      this.board = this.board || [];
     }
     m.redraw();
+  }
+
+  async postNote(e: Event) {
+    e.preventDefault();
+    if (!this.bbs || this.posting) return;
+    this.posting = true;
+    try {
+      await call('POST', '/bbs', { topic: this.bbs.topic, subject: this.note.subject, body: this.note.body });
+      this.note = { subject: '', body: '' };
+      this.writing = false;
+      await this.openBoard(this.bbs.topic);
+    } catch (err: any) {
+      app.alerts.show({ type: 'error' } as any, errorText(err));
+    }
+    this.posting = false;
+    m.redraw();
+  }
+
+  async deleteNote(id: number) {
+    if (!confirm(tt('board.delete_confirm'))) return;
+    await call('POST', '/bbs', { delete: id }).catch(() => {});
+    this.openBoard(this.bbs?.topic);
   }
 
   async send(line?: string) {
@@ -205,8 +248,8 @@ export default class HangoutPage extends Page {
   onupdate(vnode: Mithril.VnodeDOM) {
     super.onupdate?.(vnode);
     // The first lines arrive at the bottom; after that, follow along only while the reader is at the bottom.
-    this.scrollLog(!this.settled && !!this.live.logs[this.live.tab].length);
-    if (this.live.logs[this.live.tab].length) this.settled = true;
+    this.scrollLog(!this.settled && !!this.live.logs[this.live.tab]?.length);
+    if (this.live.logs[this.live.tab]?.length) this.settled = true;
     this.liftBar();
   }
 
@@ -337,7 +380,11 @@ export default class HangoutPage extends Page {
             </button>
           ) : null}
         </div>
-        {live.who.length ? WhoTable({ live, people: live.who.slice(0, 12) }) : <p className="HangoutEmpty">{t('who.empty')}</p>}
+        {live.who.length ? (
+          WhoTable({ live, people: [...live.who].sort((a, b) => Number(live.friends.has(b.id)) - Number(live.friends.has(a.id))).slice(0, 12) })
+        ) : (
+          <p className="HangoutEmpty">{t('who.empty')}</p>
+        )}
         {live.who.length > 12 ? <p className="HangoutEmpty">{t('who.more', { count: live.who.length - 12 })}</p> : null}
       </div>
     );
@@ -345,7 +392,9 @@ export default class HangoutPage extends Page {
 
   logPanel() {
     const live = this.live;
-    const tabs: Tab[] = live.me ? ['room', 'tells'] : ['room'];
+    const chans = live.channels.filter((c) => c.in);
+    const tabs: Tab[] = live.me ? ['room', ...chans.map((c) => 'chan:' + c.id), 'tells', 'mail'] : ['room'];
+    const label = (tab: Tab) => (tab.startsWith('chan:') ? '#' + (chans.find((c) => 'chan:' + c.id === tab)?.name || '') : t('tabs.' + tab));
     return (
       <div className="HangoutCard HangoutLogPanel">
         <div className="HangoutTabs" role="tablist">
@@ -357,18 +406,73 @@ export default class HangoutPage extends Page {
               className={classList('HangoutTab', live.tab === tab && 'is-active')}
               onclick={() => this.switchTab(tab)}
             >
-              {t('tabs.' + tab)}
+              {label(tab)}
               {live.unread[tab] ? <span className="HangoutTab-badge">{live.unread[tab]}</span> : null}
             </button>
           ))}
         </div>
         <div className="HangoutLog" role="log" aria-live="polite">
-          {live.logs[live.tab].length ? (
+          {live.tab === 'mail' ? (
+            this.mailView()
+          ) : live.logs[live.tab]?.length ? (
             live.logs[live.tab].map((line) => <div key={line.id}>{renderLine(live, line)}</div>)
           ) : (
-            <p className="HangoutEmpty">{t(live.tab === 'tells' ? 'tabs.tells_empty' : 'tabs.room_empty')}</p>
+            <p className="HangoutEmpty">
+              {t(live.tab === 'tells' ? 'tabs.tells_empty' : live.tab.startsWith('chan:') ? 'tabs.chan_empty' : 'tabs.room_empty')}
+            </p>
           )}
         </div>
+      </div>
+    );
+  }
+
+  mailView() {
+    const mail = this.live.mail;
+    if (!mail) return <LoadingIndicator size="small" />;
+    return (
+      <div className="HangoutMail">
+        <p className="HangoutLine-hint">{t('mail.hint')}</p>
+        {mail.length ? (
+          mail.map((x) => (
+            <details
+              className={classList('HangoutMail-item', !x.read && 'is-unread')}
+              ontoggle={(e: Event) => {
+                if ((e.target as HTMLDetailsElement).open && !x.read) {
+                  x.read = true;
+                  this.live.unread.mail = Math.max(0, this.live.unread.mail - 1);
+                  call('POST', '/act', { line: 'mail read ' + x.id }).catch(() => {});
+                }
+              }}
+            >
+              <summary>
+                <strong>{x.from}</strong> <span className="HangoutMail-subject">{x.subject}</span>
+                <span className="HangoutLine-time">
+                  {new Date(x.at * 1000).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                </span>
+              </summary>
+              <p className="HangoutMail-body">{linkify(x.body)}</p>
+              <div className="HangoutMail-actions">
+                {x.fromU ? (
+                  <button type="button" className="HangoutLinkButton" onclick={() => this.prefill(`mail ${x.fromU} = `)}>
+                    {t('mail.reply')}
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="HangoutLinkButton"
+                  onclick={async () => {
+                    await call('POST', '/act', { line: 'mail delete ' + x.id }).catch(() => {});
+                    this.live.loadMail();
+                  }}
+                >
+                  {t('mail.delete')}
+                </button>
+              </div>
+            </details>
+          ))
+        ) : (
+          <p className="HangoutEmpty">{t('mail.empty')}</p>
+        )}
       </div>
     );
   }
@@ -414,6 +518,7 @@ export default class HangoutPage extends Page {
           {c.afk !== undefined && c.afk !== null ? ' · ' + tt(c.afk ? 'card.afk_reason' : 'card.afk', { reason: c.afk }) : ''}
         </p>
         {c.total ? <p className="HangoutMember-line">{t('card.total', { time: duration(c.total) })}</p> : null}
+        {c.partner ? <p className="HangoutMember-line">{t('card.partner', { name: c.partner })}</p> : null}
         {local && c.con ? (
           <p className="HangoutMember-line">
             {t('card.clock', { time: local.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: 'UTC' }) })}
@@ -447,6 +552,12 @@ export default class HangoutPage extends Page {
             <a className="Button" href={app.route('user', { username: c.s })}>
               {t('card.profile')}
             </a>
+            <button type="button" className="Button" onclick={() => this.send(`friend ${live.friends.has(c.id) ? 'remove' : 'add'} ${c.u}`)}>
+              {t(live.friends.has(c.id) ? 'card.unfriend' : 'card.friend')}
+            </button>
+            <button type="button" className="Button" onclick={() => this.send(`enemy ${live.enemies.has(c.id) ? 'remove' : 'add'} ${c.u}`)}>
+              {t(live.enemies.has(c.id) ? 'card.unignore' : 'card.ignore')}
+            </button>
           </div>
         ) : (
           <div className="HangoutMember-actions">
@@ -475,25 +586,112 @@ export default class HangoutPage extends Page {
   }
 
   boardView() {
+    const bbs = this.bbs;
     return (
       <div className="HangoutMember HangoutBoard" role="dialog" aria-label={tt('board.title')}>
         <button type="button" className="HangoutMember-close" aria-label={tt('card.close')} onclick={() => (this.boardOpen = false)}>
           ×
         </button>
         <strong className="HangoutMember-name">{t('board.title')}</strong>
-        {this.board === null ? (
+        <div className="HangoutTabs">
+          {(['bbs', 'newest'] as const).map((k) => (
+            <button type="button" className={classList('HangoutTab', this.boardTab === k && 'is-active')} onclick={() => (this.boardTab = k)}>
+              {t('board.tab_' + k)}
+            </button>
+          ))}
+        </div>
+        {this.boardTab === 'newest' ? (
+          this.board === null ? (
+            <LoadingIndicator size="small" />
+          ) : this.board.length ? (
+            <ul className="HangoutBoard-list">
+              {this.board.map((d: any) => (
+                <li>
+                  <a href={app.route.discussion(d)}>{d.title()}</a>
+                  <span className="HangoutBoard-meta">{d.user()?.displayName?.() || ''}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="HangoutEmpty">{t('board.empty')}</p>
+          )
+        ) : !bbs ? (
           <LoadingIndicator size="small" />
-        ) : this.board.length ? (
-          <ul className="HangoutBoard-list">
-            {this.board.map((d: any) => (
-              <li>
-                <a href={app.route.discussion(d)}>{d.title()}</a>
-                <span className="HangoutBoard-meta">{d.user()?.displayName?.() || ''}</span>
-              </li>
-            ))}
-          </ul>
         ) : (
-          <p className="HangoutEmpty">{t('board.empty')}</p>
+          <div className="HangoutBbs">
+            <div className="HangoutWords">
+              {bbs.topics.map((topic) => (
+                <button
+                  type="button"
+                  className={classList('HangoutWord', topic.id === bbs.topic && 'is-active')}
+                  onclick={() => this.openBoard(topic.id)}
+                >
+                  {topic.name} · {topic.n}
+                </button>
+              ))}
+            </div>
+            {this.live.me ? (
+              this.writing ? (
+                <form className="HangoutBbs-form" onsubmit={(e: Event) => this.postNote(e)}>
+                  <label className="HangoutBar-label" htmlFor="hangout-note-subject">
+                    {t('board.subject')}
+                  </label>
+                  <input
+                    id="hangout-note-subject"
+                    className="FormControl"
+                    maxlength={80}
+                    placeholder={tt('board.subject')}
+                    value={this.note.subject}
+                    oninput={(e: InputEvent) => (this.note.subject = (e.target as HTMLInputElement).value)}
+                  />
+                  <label className="HangoutBar-label" htmlFor="hangout-note-body">
+                    {t('board.body')}
+                  </label>
+                  <textarea
+                    id="hangout-note-body"
+                    className="FormControl"
+                    rows={4}
+                    maxlength={2000}
+                    placeholder={tt('board.body')}
+                    value={this.note.body}
+                    oninput={(e: InputEvent) => (this.note.body = (e.target as HTMLTextAreaElement).value)}
+                  />
+                  <div className="HangoutBbs-actions">
+                    <Button type="submit" className="Button Button--primary" loading={this.posting}>
+                      {t('board.post')}
+                    </Button>
+                    <Button className="Button" onclick={() => (this.writing = false)}>
+                      {t('board.cancel')}
+                    </Button>
+                  </div>
+                </form>
+              ) : (
+                <Button className="Button" icon="fas fa-thumbtack" onclick={() => (this.writing = true)}>
+                  {t('board.write')}
+                </Button>
+              )
+            ) : null}
+            {bbs.messages.length ? (
+              <ul className="HangoutBoard-list">
+                {bbs.messages.map((note: any) => (
+                  <li>
+                    <strong className="HangoutBbs-subject">{note.subject}</strong>
+                    <span className="HangoutBbs-body">{linkify(note.body)}</span>
+                    <span className="HangoutBoard-meta">
+                      {note.by} · {new Date(note.at * 1000).toLocaleDateString()}
+                      {note.mine ? (
+                        <button type="button" className="HangoutLinkButton" onclick={() => this.deleteNote(note.id)}>
+                          {t('board.delete')}
+                        </button>
+                      ) : null}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="HangoutEmpty">{t('board.no_notes')}</p>
+            )}
+          </div>
         )}
       </div>
     );

@@ -50,6 +50,14 @@ const COMMANDS = [
   'cmessage',
   'colour',
   'time',
+  'shout',
+  'yell',
+  'channel',
+  'friend',
+  'mail',
+  'bbs',
+  'alias',
+  'partner',
   'quit',
 ];
 
@@ -114,7 +122,17 @@ export function renderLine(live: Live, line: Line): Mithril.Children {
       );
     }
     case 'shout':
-      return <div className="HangoutLine HangoutLine--shout">{t('line.shout', { name: who, text })}</div>;
+      return <div className="HangoutLine HangoutLine--shout">{t(mine ? 'line.you_shout' : 'line.shout', { name: who, text })}</div>;
+    case 'chan':
+      return (
+        <div className="HangoutLine">
+          <span className="HangoutLine-chan">[{d.ch}]</span> {d.em ? [who, ' ', text] : t('line.chan', { name: who, text })}
+        </div>
+      );
+    case 'partner':
+      return <div className="HangoutLine HangoutLine--shout">{t('line.partner', { name: who, with: d.with })}</div>;
+    case 'propose':
+      return <div className="HangoutLine HangoutLine--private">{t(mine ? 'line.propose_sent' : 'line.propose', { name: who, to: to(d.to) })}</div>;
     case 'yell':
       return <div className="HangoutLine HangoutLine--shout">{t('line.yell', { name: who, text, area: d.area })}</div>;
     default:
@@ -201,6 +219,62 @@ function renderOut(live: Live, out: Record<string, any>): Mithril.Children {
       );
     case 'usage':
       return sys(t('out.usage', { usage: out.usage }), 'error');
+    case 'channels':
+      return sys(
+        <div>
+          <strong>{t('out.channels_title')}</strong>
+          <ul className="HangoutList">
+            {out.channels.map((c: any) => (
+              <li>
+                <strong>#{c.name}</strong> · {tt('out.channel_count', { count: c.n })}{' '}
+                {c.description ? <span className="HangoutLine-hint">{c.description}</span> : null}{' '}
+                <button type="button" className="HangoutWord" onclick={() => live.act(`channel ${c.in ? 'leave' : 'join'} ${c.name}`)}>
+                  {t(c.in ? 'out.channel_leave_button' : 'out.channel_join_button')}
+                </button>
+              </li>
+            ))}
+          </ul>
+          <p className="HangoutLine-hint">{t('out.channels_hint')}</p>
+        </div>
+      );
+    case 'channel_who':
+      return sys(t('out.channel_who', { name: out.name, people: out.people.join(', ') || tt('out.none') }));
+    case 'friends':
+    case 'enemies':
+      return sys(
+        <div>
+          <strong>{t('out.' + k + '_title')}</strong>
+          {out.people.length ? (
+            <ul className="HangoutList">
+              {out.people.map((p: any) => (
+                <li>
+                  {Name(live, p.id, p.n)}{' '}
+                  {p.room ? (
+                    <span className="HangoutLine-hint">{t('out.friend_in', { room: p.room })}</span>
+                  ) : k === 'friends' ? (
+                    <span className="HangoutLine-hint">{t('out.friend_off')}</span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>{t('out.' + k + '_none')}</p>
+          )}
+        </div>
+      );
+    case 'aliases':
+      return sys(
+        <div>
+          <strong>{t('out.aliases_title')}</strong>
+          {Object.keys(out.aliases).length ? (
+            <dl className="HangoutHelp">{Object.entries(out.aliases).map(([name, cmd]) => [<dt>{name}</dt>, <dd>{String(cmd)}</dd>])}</dl>
+          ) : (
+            <p>{t('out.aliases_none')}</p>
+          )}
+        </div>
+      );
+    case 'partner_status':
+      return sys(t(out.name ? `out.partner_${out.state}` : 'out.partner_none', { name: out.name }));
     default:
       return sys(t('out.' + k, out));
   }
@@ -215,6 +289,11 @@ export function WhoTable({ live, people }: { live: Live; people: Person[] }): Mi
         {people.map((p) => (
           <tr key={p.id}>
             <td className="HangoutWho-name">
+              {live.friends.has(p.id) ? (
+                <span className="HangoutWho-friend" title={tt('who.friend')}>
+                  ★{' '}
+                </span>
+              ) : null}
               {Name(live, p.id, fullName(p), p.rk)} {p.ti ? <span className="HangoutWho-title">{p.ti}</span> : null}
             </td>
             <td className="HangoutWho-room">{p.room || live.state?.rooms.find((r) => r.id === p.r)?.name || ''}</td>

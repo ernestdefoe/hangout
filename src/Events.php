@@ -138,6 +138,22 @@ final class Events
     }
 
     /**
+     * Recent talk on some channels, oldest first, for someone opening the Hangout.
+     *
+     * @param  int[]  $channels
+     * @return array<int, array<string, mixed>>
+     */
+    public function recentChannels(array $channels, int $limit = 60): array
+    {
+        if (! $channels) {
+            return [];
+        }
+
+        return $this->db->table('hangout_events')->where('audience', 'chan')->whereIn('channel_id', $channels)
+            ->orderByDesc('id')->limit($limit)->get()->reverse()->map(fn ($row) => self::present($row))->values()->all();
+    }
+
+    /**
      * Private messages one member received or sent, newest first (recall, the Tells tab).
      *
      * @param  string[]  $kinds

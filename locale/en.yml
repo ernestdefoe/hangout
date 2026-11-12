@@ -28,6 +28,7 @@ ernestdefoe-hangout:
       log_in: Log in
     who:
       title: "Who's on · {count}"
+      friend: Your friend
       full: Full list
       empty: Nobody is here right now.
       more: "and {count} more (type who)"
@@ -36,6 +37,8 @@ ernestdefoe-hangout:
       tells: Tells
       room_empty: It's quiet. Say hello!
       tells_empty: Pages and tells sent to you show up here. Try "tell name = hi".
+      chan_empty: Nothing said on this channel since you came in.
+      mail: Mail
     card:
       close: Close
       feeling: "{name} is feeling {feeling}."
@@ -51,10 +54,36 @@ ernestdefoe-hangout:
       walk: Walk over
       wave: Wave
       profile: Profile
+      friend: Add friend
+      unfriend: Unfriend
+      ignore: Ignore
+      unignore: Stop ignoring
+      partner: "Partner of {name}"
       latest: "Latest post: {excerpt} in {discussion}"
     board:
-      title: Notice board · newest discussions
+      title: The notice board
+      tab_bbs: Board
+      tab_newest: Newest discussions
       empty: Nothing posted yet.
+      no_notes: No notes on this board yet. Pin the first one!
+      write: Pin a note
+      subject: Subject
+      body: Your note
+      post: Pin it
+      cancel: Cancel
+      delete: Take down
+      delete_confirm: Take this note down?
+    mail:
+      hint: "Mail waits for people who aren't here. Send it with mail name = message."
+      empty: No mail yet.
+      reply: Reply
+      delete: Delete
+    notification:
+      mail: "{username} sent you Hangout mail"
+      setting: Someone sends me Hangout mail
+    alerts:
+      friend_on: "{name}, your friend, has connected."
+      proposal: "{name} has asked to be your partner. Type partner accept, or partner decline."
     idle:
       now: now
       m: "{n}m"
@@ -80,6 +109,19 @@ ernestdefoe-hangout:
       no_such_mood: "{name} isn't one of the feelings. Type feeling list to see them all."
       no_rooms: The Hangout has no rooms yet.
       shout_wait: "You can shout again in {minutes, plural, one {# minute} other {# minutes}}."
+      yell_wait: You can yell once a minute.
+      which_channel: "Which channel? Type -name message, for example -gaming hello."
+      no_channels: "You're not on any channel yet. Type channels to see them."
+      no_such_channel: "There's no channel called {name}."
+      channel_exists: "#{name} already exists."
+      no_friends_on: None of your friends are connected right now.
+      blocked: "They aren't taking messages from you."
+      too_many: "That's the most you can have ({max})."
+      no_such_mail: That mail isn't there.
+      mailbox_full: "{name}'s mailbox is full."
+      no_proposal: Nobody has asked to be your partner.
+      already_partnered: You already have a partner. Type partner end first.
+      bbs_incomplete: A note needs a subject and some words.
     line:
       says: "{name} says, “{text}”"
       asks: "{name} asks, “{text}”"
@@ -108,6 +150,11 @@ ernestdefoe-hangout:
       remote_group: "From afar (to you and {others}), {name} {text}"
       remote_sent: "To {to}, from afar: {name} {text}"
       shout: "{name} shouts, “{text}”"
+      you_shout: "You shout, “{text}”"
+      chan: "{name}: {text}"
+      partner: "{name} and {with} are now partners! Congratulations!"
+      propose: "{name} asks if you'll be their partner. Type partner accept, or partner decline."
+      propose_sent: "You ask {to} to be your partner."
       yell: "{name} yells across {area}, “{text}”"
     out:
       unknown: "Sorry, “{command}” isn't a command. Type help for a list."
@@ -144,6 +191,35 @@ ernestdefoe-hangout:
       dmessage_set_reset: Your disconnect message is cleared.
       feeling_set: "You're feeling {value} now."
       feeling_set_reset: Your feeling is cleared.
+      channels_title: Channels
+      channel_count: "{count, plural, one {# member} other {# members}}"
+      channel_join_button: Join
+      channel_leave_button: Leave
+      channels_hint: "Talk on a channel with -name message (for example -gaming who's playing?). It follows you from room to room."
+      channel_join: "You join #{name}. It has its own tab now."
+      channel_leave: "You leave #{name}."
+      channel_create: "You start #{name}."
+      channel_who: "On #{name}: {people}"
+      friends_title: Your friends
+      friends_none: "No friends yet. Add one with friend name."
+      enemies_title: People you ignore
+      enemies_none: You aren't ignoring anyone.
+      friend_in: "here, in {room}"
+      friend_off: not connected
+      friend_add: "{name} is your friend now: you'll hear when they connect."
+      friend_remove: "{name} isn't on your friends list any more."
+      enemy_add: "You're ignoring {name}: their talk is hidden and their pages and tells won't reach you."
+      enemy_remove: "You stop ignoring {name}."
+      mail_sent: "Mail sent to {name}. They'll get a notification."
+      aliases_title: Your aliases
+      aliases_none: "No aliases yet. Make one with alias hi = say hello everyone!"
+      alias_set: "“{name}” now does: {command}"
+      alias_removed: "The alias “{name}” is gone."
+      partner_none: "You haven't got a partner. Ask someone with partner name."
+      partner_married: "You're partners with {name}."
+      partner_proposed: "You've asked {name}; they haven't answered yet."
+      partner_declined: "You turn {name} down, kindly."
+      partner_ended: "You're single again."
     help:
       title: Commands
       tokens: "Shortcuts: \"hello says it, :waves emotes, +hmm thinks, >ben hi tells, <ben waves remotes. Arrow keys walk; Enter jumps here."
@@ -170,6 +246,14 @@ ernestdefoe-hangout:
         colour: "colour #e8833a"
         time: time
         quit: quit
+        shout: "shout <message>  (!message)"
+        yell: yell <message>
+        channel: "channels · channel join <name> · -<name> <message>"
+        friend: "friend <name> · friends · enemy <name>"
+        mail: "mail <name> = <message> · mail"
+        bbs: bbs
+        alias: "alias <name> = <command>"
+        partner: "partner <name> · partner accept · partner end"
       what:
         say: Talk to the room. A speech bubble pops up over you.
         emote: "Do something: “:waves hello” shows “Ernest waves hello”."
@@ -193,6 +277,14 @@ ernestdefoe-hangout:
         colour: Your clothes' colour.
         time: The time on the forum's clock.
         quit: Leave the Hangout.
+        shout: One line to every room. Mortals wait between shouts.
+        yell: Heard in every room of your area.
+        channel: Channels follow you between rooms, each with its own tab.
+        friend: Friends are pinged when they connect; enemies are ignored.
+        mail: A note for someone who isn't here; it arrives as a notification.
+        bbs: The notice board in the Lobby.
+        alias: Your own short commands.
+        partner: "TCZ's 'net' partners: ask, accept, or part."
   admin:
     settings:
       nav: Show Hangout in the forum's navigation

@@ -344,7 +344,8 @@ final class World
     {
         $blocked = Furniture::blocked($this->items((int) $room->id));
         $taken = $this->db->table('hangout_presence')->where('room_id', $room->id)->get(['x', 'y'])->map(fn ($p) => $p->y * 256 + $p->x)->flip()->all();
-        $start = [intdiv((int) $room->width, 2), max(0, (int) $room->height - 3)];
+        // Somewhere near the front middle, a little different each time, so arrivals don't stack up.
+        $start = [intdiv((int) $room->width, 2) + random_int(-3, 3), max(0, (int) $room->height - 3 + random_int(-1, 1))];
         if ($from) {
             foreach ($this->exits((int) $room->id) as $exit) {
                 if ((int) $exit->target_id === (int) $from->id) {
@@ -361,7 +362,7 @@ final class World
                         continue;
                     }
                     [$x, $y] = [$start[0] + $dx, $start[1] + $dy];
-                    if ($x >= 0 && $y >= 0 && $x < $room->width && $y < $room->height && ! isset($blocked[$y * 256 + $x]) && ($r > 1 || ! isset($taken[$y * 256 + $x]))) {
+                    if ($x >= 0 && $y >= 0 && $x < $room->width && $y < $room->height && ! isset($blocked[$y * 256 + $x]) && ($r > 6 || ! isset($taken[$y * 256 + $x]))) {
                         return [$x, $y];
                     }
                 }
