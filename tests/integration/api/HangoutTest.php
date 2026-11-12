@@ -211,4 +211,52 @@ class HangoutTest extends TestCase
 
         $this->assertSame($one, $twenty, "who: $one queries for one person, $twenty for twenty-one");
     }
+
+    #[Test]
+    public function every_endpoint_costs_the_same_for_one_person_as_for_twenty_one_as_guest_or_admin(): void
+    {
+        $rows = [];
+        for ($i = 10; $i < 30; $i++) {
+            $rows[] = ['id' => $i, 'username' => "member$i", 'email' => "m$i@machine.local", 'is_email_confirmed' => 1];
+        }
+        $this->prepareDatabase([
+            User::class => $rows,
+            'group_permission' => [['group_id' => Group::GUEST_ID, 'permission' => 'ernestdefoe-hangout.view']],
+        ]);
+
+        $count = function (string $path, ?int $as, array $query = []): int {
+            $db = $this->database();
+            $db->flushQueryLog();
+            $db->enableQueryLog();
+            [$status] = $this->api('GET', $path, $as, [], $query);
+            $n = count($db->getQueryLog());
+            $db->disableQueryLog();
+            $this->assertSame(200, $status, $path);
+
+            return $n;
+        };
+        $measure = function () use ($count): array {
+            $head = $this->api('GET', '', 1)[1]['head'];
+            $this->act(2, 'say hello');
+
+            return [
+                'state admin' => $count('', 1), 'state guest' => $count('', null),
+                'poll admin' => $count('/poll', 1, ['since' => (string) $head]), 'poll guest' => $count('/poll', null, ['since' => (string) $head, 'room' => '1']),
+                'who admin' => $count('/who', 1), 'who guest' => $count('/who', null),
+                'card admin' => $count('/people/2', 1), 'card guest' => $count('/people/2', null),
+            ];
+        };
+
+        $this->api('GET', '', 2);
+        $one = $measure();
+        for ($i = 10; $i < 30; $i++) {
+            $this->api('GET', '', $i);
+        }
+        $twenty = $measure();
+
+        @file_put_contents(__DIR__.'/../tmp/queries-'.getenv('DB_DRIVER').'.json', json_encode(['2 people' => $one, '22 people' => $twenty], JSON_PRETTY_PRINT));
+        foreach ($one as $what => $n) {
+            $this->assertLessThanOrEqual($n, $twenty[$what], "$what: $n queries with 2 people, {$twenty[$what]} with 22");
+        }
+    }
 }
