@@ -18,8 +18,9 @@ use Illuminate\Database\ConnectionInterface;
 final class World
 {
     public const STALE = 150;
+    public const LEAVE_GRACE = 15;
     private const BEAT = 25;
-    private const SWEEP = 20;
+    private const SWEEP = 10;
 
     /** Body colours for members who haven't picked one. */
     private const COLOURS = ['#e8833a', '#7dd3fc', '#f9a8d4', '#a3e635', '#c4a7ff', '#fbbf24', '#5eead4', '#fb7185', '#93c5fd', '#fdba74'];
@@ -222,6 +223,8 @@ final class World
     {
         $this->sweep();
         if ($presence = $this->presence((int) $user->id)) {
+            // Back within the grace after leaving (a reload, the next page): no goodbye, no hello.
+            $this->cache->forget('ernestdefoe-hangout.left.'.$user->id);
             $this->beat($user, true);
 
             return $presence;
@@ -271,6 +274,19 @@ final class World
         ]);
     }
 
+    /**
+     * Leaving the page: gone in LEAVE_GRACE seconds unless they come straight
+     * back (a reload, or opening the Hangout again from another page), so that
+     * doesn't fill everyone's log with goodbyes and hellos. The sweep then says
+     * their own goodbye, not "lost their connection".
+     */
+    public function leave(int $userId): void
+    {
+        $this->cache->put('ernestdefoe-hangout.left.'.$userId, 1, self::STALE + 60);
+        $this->db->table('hangout_presence')->where('user_id', $userId)->update(['seen_at' => date('Y-m-d H:i:s', time() - self::STALE + self::LEAVE_GRACE)]);
+        $this->cache->forget('ernestdefoe-hangout.beat.'.$userId);
+    }
+
     /** "Still here": the poll's heartbeat, written at most every BEAT seconds. */
     public function beat(User $user, bool $force = false): void
     {
@@ -288,7 +304,7 @@ final class World
         }
         $stale = $this->db->table('hangout_presence')->where('seen_at', '<', date('Y-m-d H:i:s', time() - self::STALE))->pluck('user_id');
         foreach ($stale as $id) {
-            $this->disconnect((int) $id, true);
+            $this->disconnect((int) $id, ! $this->cache->pull('ernestdefoe-hangout.left.'.$id));
         }
     }
 

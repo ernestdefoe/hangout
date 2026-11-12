@@ -223,7 +223,7 @@ ernestdefoe-hangout:
       partner_ended: "You're single again."
     help:
       title: Commands
-      tokens: "Shortcuts: \"hello says it, :waves emotes, +hmm thinks, >ben hi tells, <ben waves remotes. Arrow keys walk; Enter jumps here."
+      tokens: "Anything that isn't a command is said. Start with / to make it a command (/who, /wave ben). Shortcuts: :waves emotes, +hmm thinks, >ben hi tells, <ben waves remotes, !hi shouts, -gaming hi talks on a channel. Arrow keys walk; Enter jumps here."
       usage:
         say: say <message>
         emote: ":<action>  (emote, pose)"

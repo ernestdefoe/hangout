@@ -94,24 +94,83 @@ final class Commands
             return $ctx;
         }
         $this->world->touch($actor, $presence);
+        // "/who" or "/wave ben" is always a command, the way modern chats do it.
+        $forced = str_starts_with($line, '/');
+        if ($forced) {
+            $line = ltrim(mb_substr($line, 1));
+        }
         [$word, $args] = $this->split($line);
+        $aliased = false;
         // One alias expansion, TCZ style: the rest of the line is added to the end.
         if (! isset(self::WORDS[$word]) && $this->expander && ($alias = ($this->expander)($actor, $word))) {
             [$word, $more] = $this->split($alias);
             $args = trim($more.' '.$args);
+            $aliased = true;
         }
 
         if (isset($this->extra[$word])) {
             ($this->extra[$word])($ctx, $args);
-        } elseif (isset(self::WORDS[$word])) {
+        } elseif (isset(self::WORDS[$word]) && ($forced || $aliased || $this->commandLike($word, $args))) {
             $this->{self::WORDS[$word]}($ctx, $args);
-        } elseif ($feeling = Feelings::find($word)) {
+        } elseif (($feeling = Feelings::find($word)) && ($forced || $aliased || $this->feelingLike($feeling, $args))) {
             $this->feel($ctx, $feeling, $word, $args);
-        } else {
+        } elseif ($forced) {
             $ctx->say('unknown', ['command' => $word]);
+        } else {
+            // Anything else is just talking: "hello from my phone" is said, not TCZ's hello feeling.
+            $this->say($ctx, $line);
         }
 
         return $ctx;
+    }
+
+    /** Commands that read a few words at most; with a whole sentence after them it's chat ("who wants pinball?"). */
+    private const SHORT = ['who', 'where', 'look', 'l', 'examine', 'scan', 'finger', 'profile', 'go', 'walk', 'visit', 'home', 'sethome',
+        'help', 'commands', 'time', 'back', 'recall', 'feelings', 'feels', 'moods', 'quit', 'qquit'];
+
+    private function commandLike(string $word, string $args): bool
+    {
+        if (! in_array($word, self::SHORT, true)) {
+            return true;
+        }
+        $words = $args === '' ? 0 : count(preg_split('/\s+/', trim($args)) ?: []);
+
+        return $words <= 2 && ! str_ends_with(trim($args), '?');
+    }
+
+    /**
+     * A feeling only when it reads like one: on its own ("wave"), with one word
+     * ("wave happily"), with one of its keywords ("wave at…"), with "=", or
+     * aimed at someone who is here ("hug ben").
+     *
+     * @param  array<string, mixed>  $feeling
+     */
+    private function feelingLike(array $feeling, string $args): bool
+    {
+        $args = trim($args);
+        if ($args === '' || str_contains($args, '=') || ! str_contains($args, ' ')) {
+            return true;
+        }
+        // The keyword or the person may follow one adverb: "wave happily at Ben", "hug tightly ben".
+        $words = preg_split('/\s+/', mb_strtolower($args)) ?: [];
+        foreach ([0, 1] as $skip) {
+            $rest = implode(' ', array_slice($words, $skip)).' ';
+            foreach ($feeling['keywords'] as $kw) {
+                if (str_starts_with($rest, $kw.' ')) {
+                    return true;
+                }
+            }
+            $name = rtrim($words[$skip] ?? '', ',');
+            $this->find($name ?: '?');
+            // Exact names only here: a prefix match would aim "wave the flag" at someone called Theo.
+            foreach ($this->connected ?? [] as $user) {
+                if ($name === mb_strtolower((string) $user->username) || $name === mb_strtolower((string) $user->display_name)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /** @return array{0: string, 1: string} the command word and the rest */
@@ -120,7 +179,9 @@ final class Commands
         $tokens = ['"' => 'say', "'" => 'say', '`' => 'say', ':' => 'emote', ';' => 'emote', '+' => 'think', '=' => 'think',
             '>' => 'tell', '.' => 'tell', '<' => 'remote', ',' => 'remote', '!' => 'shout', '?' => 'ask', '-' => 'chat', '_' => 'chat'];
         $first = mb_substr($line, 0, 1);
-        if (isset($tokens[$first]) && ! ($first === '.' && preg_match('/^\.{2,}/', $line)) && ! ($first === '?' && mb_strlen($line) === 1)) {
+        // Quote tokens always say; the others need a letter after them, so ":)", "<3", "+1", "-1" and "..." are just said.
+        $token = isset($tokens[$first]) && (in_array($first, ['"', "'", '`'], true) || preg_match('/^.\s?\p{L}/u', $line));
+        if ($token) {
             return [$tokens[$first], ltrim(mb_substr($line, 1))];
         }
         $parts = preg_split('/\s+/', $line, 2) ?: [''];

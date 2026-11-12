@@ -176,6 +176,13 @@ class HangoutTest extends TestCase
         $head = $this->api('GET', '', 3)[1]['head'];
         $this->api('POST', '/leave', 2);
 
+        // Within the grace nothing is said (a reload must not spam the room)…
+        [, $soon] = $this->api('GET', '/poll', 3, [], ['since' => (string) $head]);
+        $this->assertNotContains('disconnect', array_column($soon['e'], 'k'));
+
+        // …after it, their own goodbye.
+        $this->database()->table('hangout_presence')->where('user_id', 2)->update(['seen_at' => date('Y-m-d H:i:s', time() - 1000)]);
+        $this->app()->getContainer()->make('cache.store')->forget('ernestdefoe-hangout.sweep');
         [, $poll] = $this->api('GET', '/poll', 3, [], ['since' => (string) $head]);
         $bye = array_values(array_filter($poll['e'], fn ($e) => $e['k'] === 'disconnect'))[0];
         $this->assertSame('heads off to bed', $bye['t']);
@@ -258,5 +265,27 @@ class HangoutTest extends TestCase
         foreach ($one as $what => $n) {
             $this->assertLessThanOrEqual($n, $twenty[$what], "$what: $n queries with 2 people, {$twenty[$what]} with 22");
         }
+    }
+
+    #[Test]
+    public function plain_chat_is_said_and_commands_still_work(): void
+    {
+        $this->api('GET', '', 2);
+        $this->api('GET', '', 3);
+        $kind = fn (string $line) => ($this->act(2, $line)['e'][0]['k'] ?? null) ?? ($this->act(2, $line)['out'][0]['k'] ?? null);
+
+        $this->assertSame('say', $this->act(2, 'hello from my phone')['e'][0]['k']);
+        $this->assertSame('hello from my phone', $this->act(2, 'hello from my phone')['e'][0]['t']);
+        $this->assertSame('say', $this->act(2, 'who wants pinball tonight?')['e'][0]['k']);
+        $this->assertSame('say', $this->act(2, ':)')['e'][0]['k']);
+        $this->assertSame('say', $this->act(2, '<3 this place')['e'][0]['k']);
+        $this->assertSame('feel', $this->act(2, 'wave at dana')['e'][0]['k']);
+        $this->assertSame('feel', $this->act(2, 'hug dana')['e'][0]['k']);
+        $this->assertSame('feel', $this->act(2, 'wave')['e'][0]['k']);
+        $this->assertSame('emote', $this->act(2, ':waves')['e'][0]['k']);
+        $this->assertSame('who', $this->act(2, 'who')['out'][0]['k']);
+        $this->assertSame('who', $this->act(2, '/who')['out'][0]['k']);
+        $this->assertSame('unknown', $this->act(2, '/blorp')['out'][0]['k']);
+        $this->assertSame('tell', $this->act(2, 'tell dana = hi')['e'][0]['k']);
     }
 }
