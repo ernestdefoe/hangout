@@ -397,6 +397,11 @@ export default class Live {
     if (!log) return;
     this.logs[log].push({ e, id: ++lineId });
     this.trim(log);
+    // Your own page or tell also shows where you typed it (TCZ's "You tell Ben…"), so it doesn't seem to vanish.
+    if (mine && log === 'tells' && this.tab !== 'tells' && this.logs[this.tab]) {
+      this.logs[this.tab].push({ e, id: ++lineId });
+      this.trim(this.tab);
+    }
     if (log !== this.tab && !mine) this.unread[log] = (this.unread[log] || 0) + 1;
   }
 
