@@ -754,9 +754,12 @@ export default class Stage {
       const x = this.sx(a.x * T + T / 2);
       return x > -T / 2 && x < this.cssW() + T / 2;
     });
-    for (const a of seen) this.drawTag(g, a, now);
+    // Name tags: front people keep their place; a tag behind that would overlap is lifted clear of it.
+    const tags: { x: number; y: number; w: number; h: number }[] = [];
+    const placed = [...seen].reverse().map((a) => ({ a, at: this.placeTag(g, a, tags) }));
+    for (const { a, at } of placed.reverse()) this.drawTag(g, a, at);
     // Front people's bubbles first; anyone behind whose bubble would overlap is lifted above it.
-    const taken: { x: number; y: number; w: number; h: number }[] = [];
+    const taken: { x: number; y: number; w: number; h: number }[] = [...tags];
     for (const a of [...seen].reverse()) this.drawBubble(g, a, now, taken);
   }
 
@@ -958,34 +961,63 @@ export default class Stage {
     }
   }
 
-  private drawTag(g: CanvasRenderingContext2D, a: Actor, now: number) {
+  /** Where a name tag goes: over the head, or lifted above any tag already placed there. */
+  private placeTag(g: CanvasRenderingContext2D, a: Actor, taken: { x: number; y: number; w: number; h: number }[]) {
+    const { w } = this.tagSize(g, a);
+    const h = 17;
+    const x = Math.max(2, Math.min(this.cssW() - w - 2, this.sx(a.x * T + T / 2) - w / 2));
+    const home = this.sy(WALL + a.y * T + T * 0.8 - 86) - 20 - (a.anim === 'dance' ? 4 : 0);
+    let y = home;
+    for (let i = 0; i < 5; i++) {
+      const hit = taken.find((r) => x < r.x + r.w + 2 && x + w + 2 > r.x && y < r.y + r.h + 2 && y + h + 2 > r.y);
+      if (!hit) break;
+      y = hit.y - h - 3;
+    }
+    y = Math.max(2, y);
+    taken.push({ x, y, w, h });
+    return { x, y, home };
+  }
+
+  private tagSize(g: CanvasRenderingContext2D, a: Actor) {
     const p = a.p;
     const rank = this.hooks.ranks.name(p.rk);
-    const color = this.hooks.ranks.color(p.rk);
     g.font = `600 11px ${this.font}`;
-    const name = p.n;
-    const nameW = g.measureText(name).width;
-    g.font = `500 10px ${this.font}`;
-    const showRank = p.rk !== 'mortal';
-    const rankW = showRank ? g.measureText(rank).width + 6 : 0;
-    const w = nameW + rankW + 14;
-    const x = Math.max(2, Math.min(this.cssW() - w - 2, this.sx(a.x * T + T / 2) - w / 2));
-    const y = this.sy(WALL + a.y * T + T * 0.8 - 86) - 20 - (a.anim === 'dance' ? 4 : 0);
+    const nameW = g.measureText(p.n).width;
+    g.font = `600 10px ${this.font}`;
+    const showRank = p.rk !== 'mortal' && !!rank;
+    const rankW = showRank ? g.measureText(rank).width + 7 : 0;
+    return { w: Math.ceil(nameW + rankW + 15), nameW, rank, showRank };
+  }
+
+  private drawTag(g: CanvasRenderingContext2D, a: Actor, at: { x: number; y: number; home: number }) {
+    const p = a.p;
+    const { w, nameW, rank, showRank } = this.tagSize(g, a);
+    const { x, y } = at;
+    const me = p.id === this.hooks.meId;
     g.save();
     g.globalAlpha = Math.max(0, Math.min(1, a.fade));
-    pill(g, x, y, w, 17, p.id === this.hooks.meId ? 'rgba(232,131,58,0.92)' : 'rgba(18,20,26,0.84)');
+    // A lifted tag keeps a thin line down to its owner, so it's clear whose it is.
+    if (y < at.home - 4) {
+      const cx = this.sx(a.x * T + T / 2);
+      g.strokeStyle = 'rgba(18,20,26,0.55)';
+      g.lineWidth = 1.5;
+      g.beginPath();
+      g.moveTo(cx, y + 17);
+      g.lineTo(cx, at.home + 14);
+      g.stroke();
+    }
+    pill(g, x, y, w, 17, me ? 'rgba(232,131,58,0.95)' : 'rgba(18,20,26,0.86)');
     g.textBaseline = 'middle';
     g.textAlign = 'left';
     g.font = `600 11px ${this.font}`;
-    g.fillStyle = p.id === this.hooks.meId ? '#1a1d25' : '#ffffff';
-    g.fillText(name, x + 7, y + 9);
+    g.fillStyle = me ? '#1a1d25' : '#ffffff';
+    g.fillText(p.n, x + 7, y + 9);
     if (showRank) {
-      g.font = `500 10px ${this.font}`;
-      g.fillStyle = p.id === this.hooks.meId ? '#1a1d25' : color;
-      g.fillText(rank, x + 7 + nameW + 6, y + 9);
+      g.font = `600 10px ${this.font}`;
+      g.fillStyle = me ? '#1a1d25' : this.hooks.ranks.color(p.rk);
+      g.fillText(rank, x + 7 + nameW + 7, y + 9);
     }
     g.restore();
-    void now;
   }
 
   private drawBubble(g: CanvasRenderingContext2D, a: Actor, now: number, taken: { x: number; y: number; w: number; h: number }[]) {
@@ -1005,7 +1037,7 @@ export default class Stage {
     let x = cx - w / 2;
     x = Math.max(4, Math.min(this.cssW() - w - 4, x));
     let y = bottom - h;
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 6; i++) {
       const hit = taken.find((r) => x < r.x + r.w + 4 && x + w + 4 > r.x && y < r.y + r.h + 4 && y + h + 4 > r.y);
       if (!hit) break;
       y = hit.y - h - 6;
