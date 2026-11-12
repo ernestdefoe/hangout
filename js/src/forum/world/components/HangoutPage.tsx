@@ -637,7 +637,13 @@ export default class HangoutPage extends Page {
     this.input = text;
     this.card = null;
     this.cardId = null;
-    requestAnimationFrame(() => document.querySelector<HTMLTextAreaElement>('.HangoutBar-input')?.focus());
+    // Focus inside the tap itself: iOS only raises the keyboard for a focus made during the user's gesture.
+    const field = document.querySelector<HTMLTextAreaElement>('.HangoutBar-input');
+    if (field) {
+      field.value = text;
+      field.focus();
+      field.setSelectionRange(text.length, text.length);
+    }
   }
 
   boardView() {
