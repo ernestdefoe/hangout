@@ -1,0 +1,304 @@
+# Hangout's own feeling commands, written for Hangout in the format of TCZ's
+# feelings file (see generic.feelings.tcz for the format).  A feeling here
+# overrides a generic one with the same name.  $3$1 forms put the person
+# first: 'hug Ben = tightly' gives 'You hug Ben tightly.'
+
+# 'hug'  -  Hangout
+ Feeling: hug;squeeze
+Keywords: 
+DKeyword: 
+ DAction:
+   Dtext: everyone
+   Flags: DEFAULT|LIST
+   UEcho: You hug $3$1.
+   OEcho: %n hugs $3$1.
+
+# 'smile'  -  Hangout
+ Feeling: smile
+Keywords: at;to
+DKeyword: at
+ DAction:
+   Dtext:
+   Flags: DEFAULT
+   UEcho: You smile$1$2$3.
+   OEcho: %n smiles$1$2$3.
+
+# 'grin'  -  Hangout
+ Feeling: grin
+Keywords: at;to
+DKeyword: at
+ DAction:
+   Dtext:
+   Flags: DEFAULT
+   UEcho: You grin$1$2$3.
+   OEcho: %n grins$1$2$3.
+
+# 'laugh'  -  Hangout
+ Feeling: laugh;lol
+Keywords: at;with
+DKeyword: at
+ DAction:
+   Dtext:
+   Flags: DEFAULT
+   UEcho: You laugh$1$2$3.
+   OEcho: %n laughs$1$2$3.
+
+# 'giggle'  -  Hangout
+ Feeling: giggle
+Keywords: at;with
+DKeyword: at
+ DAction:
+   Dtext:
+   Flags: DEFAULT
+   UEcho: You giggle$1$2$3.
+   OEcho: %n giggles$1$2$3.
+
+# 'bow'  -  Hangout
+ Feeling: bow
+Keywords: to;before
+DKeyword: to
+ DAction:
+   Dtext:
+   Flags: DEFAULT
+   UEcho: You bow$1$2$3.
+   OEcho: %n bows$1$2$3.
+
+# 'nod'  -  Hangout
+ Feeling: nod
+Keywords: at;to
+DKeyword: at
+ DAction:
+   Dtext:
+   Flags: DEFAULT
+   UEcho: You nod$1$2$3.
+   OEcho: %n nods$1$2$3.
+
+# 'shrug'  -  Hangout
+ Feeling: shrug
+Keywords: at;to
+DKeyword: at
+ DAction:
+   Dtext:
+   Flags: DEFAULT
+   UEcho: You shrug$1$2$3.
+   OEcho: %n shrugs$1$2$3.
+
+# 'wink'  -  Hangout
+ Feeling: wink
+Keywords: at;to
+DKeyword: at
+ DAction:
+   Dtext:
+   Flags: DEFAULT
+   UEcho: You wink$1$2$3.
+   OEcho: %n winks$1$2$3.
+
+# 'cheer'  -  Hangout
+ Feeling: cheer;yay
+Keywords: for;at
+DKeyword: for
+ DAction:
+   Dtext:
+   Flags: DEFAULT
+   UEcho: You cheer$1$2$3!
+   OEcho: %n cheers$1$2$3!
+
+# 'clap'  -  Hangout
+ Feeling: clap;applaud
+Keywords: for;at
+DKeyword: for
+ DAction:
+   Dtext:
+   Flags: DEFAULT
+   UEcho: You clap$1$2$3.
+   OEcho: %n claps$1$2$3.
+
+# 'cry'  -  Hangout
+ Feeling: cry;sob
+Keywords: on;at
+DKeyword: on
+ DAction:
+   Dtext:
+   Flags: DEFAULT
+   UEcho: You burst into tears$1$2$3.
+   OEcho: %n bursts into tears$1$2$3.
+
+# 'sigh'  -  Hangout
+ Feeling: sigh
+Keywords: at;to
+DKeyword: at
+ DAction:
+   Dtext:
+   Flags: DEFAULT
+   UEcho: You sigh$1$2$3.
+   OEcho: %n sighs$1$2$3.
+
+# 'yawn'  -  Hangout
+ Feeling: yawn
+Keywords: at;to
+DKeyword: at
+ DAction:
+   Dtext:
+   Flags: DEFAULT
+   UEcho: You yawn$1$2$3.
+   OEcho: %n yawns$1$2$3.
+
+# 'poke'  -  Hangout
+ Feeling: poke;prod
+Keywords: 
+DKeyword: 
+ DAction:
+   Dtext: the air
+   Flags: DEFAULT|LIST
+   UEcho: You poke $3$1.
+   OEcho: %n pokes $3$1.
+
+# 'highfive'  -  Hangout
+ Feeling: highfive;hi5
+Keywords: 
+DKeyword: 
+ DAction:
+   Dtext: everyone
+   Flags: DEFAULT|LIST
+   UEcho: You high-five $3$1!
+   OEcho: %n high-fives $3$1!
+
+# 'bounce'  -  Hangout
+ Feeling: bounce
+Keywords: around;at
+DKeyword: around
+ DAction:
+   Dtext:
+   Flags: DEFAULT
+   UEcho: You bounce$1$2$3.
+   OEcho: %n bounces$1$2$3.
+
+# 'cuddle'  -  Hangout
+ Feeling: cuddle
+Keywords: 
+DKeyword: 
+ DAction:
+   Dtext: a pillow
+   Flags: DEFAULT|LIST
+   UEcho: You cuddle $3$1.
+   OEcho: %n cuddles $3$1.
+
+# 'sit'  -  Hangout
+ Feeling: sit
+Keywords: on;with;beside
+DKeyword: beside
+ DAction:
+   Dtext:
+   Flags: DEFAULT
+   UEcho: You sit down$1$2$3.
+   OEcho: %n sits down$1$2$3.
+
+# 'stand'  -  Hangout
+ Feeling: stand
+Keywords: beside;with
+DKeyword: beside
+ DAction:
+   Dtext:
+   Flags: DEFAULT
+   UEcho: You stand up$1$2$3.
+   OEcho: %n stands up$1$2$3.
+
+# 'wibble'  -  Hangout
+ Feeling: wibble
+Keywords: at;with
+DKeyword: at
+ DAction:
+   Dtext:
+   Flags: DEFAULT
+   UEcho: You wibble$1$2$3.
+   OEcho: %n wibbles$1$2$3.
+
+# 'moose'  -  Hangout
+ Feeling: moose
+Keywords: 
+DKeyword: 
+ DAction:
+   Dtext: about
+   Flags: DEFAULT|LIST
+   UEcho: You moose $3$1.  Nobody is quite sure what that means.
+   OEcho: %n mooses $3$1.  Nobody is quite sure what that means.
+
+# 'comfort'  -  Hangout
+ Feeling: comfort
+Keywords: 
+DKeyword: 
+ DAction:
+   Dtext: everyone
+   Flags: DEFAULT|LIST
+   UEcho: You comfort $3$1.
+   OEcho: %n comforts $3$1.
+
+# 'blush'  -  Hangout
+ Feeling: blush
+Keywords: at
+DKeyword: at
+ DAction:
+   Dtext:
+   Flags: DEFAULT
+   UEcho: You blush$1$2$3.
+   OEcho: %n blushes$1$2$3.
+
+# 'facepalm'  -  Hangout
+ Feeling: facepalm
+Keywords: at
+DKeyword: at
+ DAction:
+   Dtext:
+   Flags: DEFAULT
+   UEcho: You facepalm$1$2$3.
+   OEcho: %n facepalms$1$2$3.
+
+# 'thank'  -  Hangout
+ Feeling: thank;thanks;ty
+Keywords: 
+DKeyword: 
+ DAction:
+   Dtext: everyone
+   Flags: DEFAULT|LIST
+   UEcho: You thank $3$1.
+   OEcho: %n thanks $3$1.
+
+# 'welcome'  -  Hangout
+ Feeling: welcome
+Keywords: 
+DKeyword: 
+ DAction:
+   Dtext: everyone
+   Flags: DEFAULT|LIST
+   UEcho: You welcome $3$1.
+   OEcho: %n welcomes $3$1.
+
+# 'greet'  -  Hangout
+ Feeling: greet;hi;hello
+Keywords: 
+DKeyword: 
+ DAction:
+   Dtext:
+   Flags: DEFAULT|LIST
+   UEcho: You say hello$2$3$1.
+   OEcho: %n says hello$2$3$1.
+
+# 'bye'  -  Hangout
+ Feeling: bye;wave goodbye
+Keywords: to
+DKeyword: to
+ DAction:
+   Dtext:
+   Flags: DEFAULT
+   UEcho: You wave goodbye$1$2$3.
+   OEcho: %n waves goodbye$1$2$3.
+
+# 'ponder'  -  Hangout
+ Feeling: ponder;hmm
+Keywords: 
+DKeyword: 
+ DAction:
+   Dtext:
+   Flags: DEFAULT
+   UEcho: You ponder$1$3.
+   OEcho: %n ponders$1$3.

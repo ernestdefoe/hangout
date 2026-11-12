@@ -1,0 +1,501 @@
+import app from 'flarum/forum/app';
+import Page from 'flarum/common/components/Page';
+import Button from 'flarum/common/components/Button';
+import LoadingIndicator from 'flarum/common/components/LoadingIndicator';
+import classList from 'flarum/common/utils/classList';
+import type Mithril from 'mithril';
+import { call, duration, fullName, idle, t, tt, type Exit, type Person } from '../api';
+import Live, { type Tab } from '../Live';
+import Stage from '../Stage';
+import { linkify, renderLine, WhoTable } from './lines';
+import { PageStructure } from '../index';
+
+const EMOTES = ['wave', 'laugh', 'dance', 'sit', 'hug'];
+
+interface Card extends Person {
+  description?: string;
+  total?: number;
+  joined?: number;
+  post?: { excerpt: string; discussion: string; did: number; number: number };
+}
+
+/** /hangout: the room, the command bar, who's on, and the logs. */
+export default class HangoutPage extends Page {
+  live!: Live;
+  stage: Stage | null = null;
+  input = '';
+  history: string[] = [];
+  historyAt = -1;
+  card: Card | null = null;
+  cardId: number | null = null;
+  board: any[] | null = null;
+  boardOpen = false;
+  sending = false;
+  walked = false;
+  settled = false;
+  hintGone = false;
+  private tick: number | undefined;
+  private observer: ResizeObserver | undefined;
+
+  oninit(vnode: Mithril.Vnode) {
+    super.oninit(vnode);
+    app.history.push('hangout', tt('page.title'));
+    app.setTitle(tt('page.title'));
+    app.setTitleCount(0);
+    this.bodyClass = 'App--hangout';
+    this.live = new Live();
+    this.live.onUi = (ui) => this.ui(ui);
+    // Idle times and the sky move by the minute; nothing else redraws on a timer.
+    this.tick = window.setInterval(() => m.redraw(), 30000);
+    window.setTimeout(() => ((this.hintGone = true), m.redraw()), 9000);
+  }
+
+  oncreate(vnode: Mithril.VnodeDOM) {
+    super.oncreate(vnode);
+    const canvas = vnode.dom.querySelector('.HangoutStage-canvas') as HTMLCanvasElement;
+    const live = this.live;
+    this.stage = new Stage(canvas, {
+      walk: (x, y) => {
+        this.walked = true;
+        live.walk(x, y);
+      },
+      exit: (e: Exit) => live.exit(e.id),
+      person: (id) => this.openCard(id),
+      board: () => this.openBoard(),
+      ranks: {
+        color: (rk) => live.state?.ranks[rk]?.color || '#cbd5e1',
+        name: (rk) => live.state?.ranks[rk]?.name || '',
+      },
+      get idleAfter() {
+        return live.state?.idle || 300;
+      },
+      get tz() {
+        return live.state?.tz || 0;
+      },
+      get meId() {
+        return live.me?.id ?? null;
+      },
+    });
+    live.stage = this.stage;
+    live.start();
+    document.addEventListener('keydown', this.keys);
+    this.observer = new ResizeObserver(() => this.liftBar());
+    const bar = vnode.dom.querySelector('.HangoutBar');
+    if (bar) this.observer.observe(bar);
+    window.visualViewport?.addEventListener('resize', this.liftBar);
+    window.addEventListener('resize', this.liftBar);
+    this.liftBar();
+  }
+
+  onremove(vnode: Mithril.VnodeDOM) {
+    super.onremove(vnode);
+    this.live.stop();
+    this.stage?.destroy();
+    clearInterval(this.tick);
+    document.removeEventListener('keydown', this.keys);
+    this.observer?.disconnect();
+    window.visualViewport?.removeEventListener('resize', this.liftBar);
+    window.removeEventListener('resize', this.liftBar);
+    document.documentElement.style.removeProperty('--hangout-bar-bottom');
+    document.documentElement.style.removeProperty('--hangout-bar-height');
+  }
+
+  /**
+   * On phones the command bar is fixed to the bottom (sticky dies under any
+   * theme's overflow), above a bottom tab bar and above the keyboard.
+   */
+  liftBar = () => {
+    const tab = document.querySelector<HTMLElement>('.MobileTab-bar, .MobileTab');
+    let lift = tab && getComputedStyle(tab).position === 'fixed' && tab.offsetHeight ? tab.offsetHeight : 0;
+    const vv = window.visualViewport;
+    if (vv) {
+      const keyboard = window.innerHeight - vv.height - vv.offsetTop;
+      if (keyboard > 80) lift = keyboard;
+    }
+    const bar = document.querySelector<HTMLElement>('.HangoutBar');
+    const root = document.documentElement.style;
+    root.setProperty('--hangout-bar-bottom', `${Math.max(0, lift)}px`);
+    root.setProperty('--hangout-bar-height', `${bar?.offsetHeight || 0}px`);
+  };
+
+  /** Arrow keys walk when you're not typing; Enter jumps to the command bar. */
+  keys = (e: KeyboardEvent) => {
+    const typing = /INPUT|TEXTAREA|SELECT/.test((e.target as HTMLElement)?.tagName || '') || (e.target as HTMLElement)?.isContentEditable;
+    if (typing || e.metaKey || e.ctrlKey || e.altKey || !this.live.me) return;
+    const dirs: Record<string, [number, number]> = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
+    if (dirs[e.key]) {
+      e.preventDefault();
+      this.stage?.step(...dirs[e.key]);
+    } else if (e.key === 'Enter' || e.key === '/') {
+      const input = document.querySelector<HTMLInputElement>('.HangoutBar-input');
+      if (input) {
+        e.preventDefault();
+        input.focus();
+      }
+    } else if (e.key === 'Escape') {
+      this.card = null;
+      this.cardId = null;
+      this.boardOpen = false;
+      m.redraw();
+    }
+  };
+
+  ui(ui: Record<string, any>) {
+    if (ui.card) this.openCard(ui.card);
+    if (ui.tab) this.switchTab(ui.tab);
+    if (ui.quit) m.route.set(app.route('index'));
+    m.redraw();
+  }
+
+  switchTab(tab: Tab) {
+    this.live.tab = tab;
+    this.live.unread[tab] = 0;
+    requestAnimationFrame(() => this.scrollLog(true));
+  }
+
+  async openCard(id: number) {
+    this.cardId = id;
+    this.boardOpen = false;
+    this.card = (this.live.people.get(id) as Card) || (this.live.who.find((p) => p.id === id) as Card) || null;
+    m.redraw();
+    try {
+      const res = await call<{ card: Card }>('GET', '/people/' + id);
+      if (this.cardId === id) this.card = res.card;
+    } catch {
+      // the quick version stays
+    }
+    m.redraw();
+  }
+
+  async openBoard() {
+    this.boardOpen = true;
+    this.card = null;
+    m.redraw();
+    try {
+      this.board = (await app.store.find<any>('discussions', { sort: '-createdAt', page: { limit: 6 } } as any)) as any;
+    } catch {
+      this.board = [];
+    }
+    m.redraw();
+  }
+
+  async send(line?: string) {
+    const text = (line ?? this.input).trim();
+    if (!text || this.sending) return;
+    if (line === undefined) {
+      this.history.unshift(text);
+      this.history = this.history.slice(0, 50);
+      this.historyAt = -1;
+      this.input = '';
+    }
+    this.sending = true;
+    await this.live.act(text);
+    this.sending = false;
+    this.scrollLog(true);
+    m.redraw();
+  }
+
+  scrollLog(force = false) {
+    const log = document.querySelector<HTMLElement>('.HangoutLog');
+    if (!log) return;
+    const near = log.scrollHeight - log.scrollTop - log.clientHeight < 80;
+    if (force || near) log.scrollTop = log.scrollHeight;
+  }
+
+  onupdate(vnode: Mithril.VnodeDOM) {
+    super.onupdate?.(vnode);
+    // The first lines arrive at the bottom; after that, follow along only while the reader is at the bottom.
+    this.scrollLog(!this.settled && !!this.live.logs[this.live.tab].length);
+    if (this.live.logs[this.live.tab].length) this.settled = true;
+    this.liftBar();
+  }
+
+  view() {
+    const live = this.live;
+    const room = live.room;
+    const here = room ? [...live.people.values()].filter((p) => !p.inv || p.id === live.me?.id).length : 0;
+    return (
+      <div className="HangoutPage-wrap">
+        <PageStructure className="HangoutPage">
+          <div className="HangoutHead">
+            <h1 className="HangoutHead-title">{room ? room.name : tt('page.title')}</h1>
+            {room ? (
+              <span className="HangoutHead-sub">
+                {t('head.here', { count: here })}
+                {room.exits.length ? ' · ' + tt('head.doors', { doors: room.exits.map((e) => e.room || e.name).join(', ') }) : ''}
+              </span>
+            ) : null}
+          </div>
+          <div className="HangoutMain">
+            <section className="HangoutStageCol">
+              <div className={classList('HangoutStage', room?.look.outdoor && 'is-outdoor')}>
+                <canvas className="HangoutStage-canvas" aria-label={tt('stage.label')} role="img" />
+                {live.loading ? <LoadingIndicator /> : null}
+                {live.error ? <div className="HangoutStage-error">{live.error}</div> : null}
+                {this.card ? this.cardView(this.card) : null}
+                {this.boardOpen ? this.boardView() : null}
+                {room && (!live.me || (!this.walked && !this.hintGone)) ? (
+                  <span className="HangoutStage-hint">{t(live.me ? 'stage.hint' : 'stage.hint_guest')}</span>
+                ) : null}
+              </div>
+              {live.me ? this.emotes() : null}
+            </section>
+            <aside className="HangoutSide">
+              {this.whoPanel()}
+              {this.logPanel()}
+            </aside>
+          </div>
+          {live.me ? this.bar() : live.state ? this.guestBar() : null}
+        </PageStructure>
+      </div>
+    );
+  }
+
+  emotes() {
+    const target = this.cardId && this.cardId !== this.live.me?.id ? this.live.people.get(this.cardId) : null;
+    return (
+      <div className="HangoutEmotes" role="toolbar" aria-label={tt('emotes.label')}>
+        {EMOTES.map((e) => (
+          <button
+            type="button"
+            className="HangoutEmotes-button"
+            onclick={() => this.send(target && e !== 'sit' && e !== 'dance' ? `${e} ${target.u}` : e)}
+          >
+            {t('emotes.' + e)}
+          </button>
+        ))}
+        <button type="button" className="HangoutEmotes-button" onclick={() => this.send('feelings')}>
+          {t('emotes.more')}
+        </button>
+      </div>
+    );
+  }
+
+  bar() {
+    return (
+      <form
+        className="HangoutBar"
+        onsubmit={(e: Event) => {
+          e.preventDefault();
+          this.send();
+        }}
+      >
+        <label className="HangoutBar-label" htmlFor="hangout-say">
+          {t('bar.label')}
+        </label>
+        <input
+          id="hangout-say"
+          className="FormControl HangoutBar-input"
+          type="text"
+          autocomplete="off"
+          enterkeyhint="send"
+          maxlength={500}
+          placeholder={tt('bar.placeholder', { room: this.live.room?.name || '' })}
+          value={this.input}
+          oninput={(e: InputEvent) => (this.input = (e.target as HTMLInputElement).value)}
+          onkeydown={(e: KeyboardEvent) => {
+            if (e.key === 'ArrowUp' && this.history.length) {
+              e.preventDefault();
+              this.historyAt = Math.min(this.history.length - 1, this.historyAt + 1);
+              this.input = this.history[this.historyAt];
+            } else if (e.key === 'ArrowDown') {
+              e.preventDefault();
+              this.historyAt = Math.max(-1, this.historyAt - 1);
+              this.input = this.historyAt < 0 ? '' : this.history[this.historyAt];
+            }
+          }}
+        />
+        <Button type="submit" className="Button Button--primary HangoutBar-send" loading={this.sending}>
+          {t('bar.say')}
+        </Button>
+      </form>
+    );
+  }
+
+  guestBar() {
+    return (
+      <div className="HangoutBar HangoutBar--guest">
+        <span>{t(app.session.user ? 'bar.cannot_talk' : 'bar.guest')}</span>
+        {!app.session.user ? (
+          <Button className="Button Button--primary" onclick={() => app.modal.show(() => import('flarum/forum/components/LogInModal'))}>
+            {t('bar.log_in')}
+          </Button>
+        ) : null}
+      </div>
+    );
+  }
+
+  whoPanel() {
+    const live = this.live;
+    return (
+      <div className="HangoutCard HangoutWhoPanel">
+        <div className="HangoutCard-head">
+          <h2 className="HangoutCard-title">{t('who.title', { count: live.who.length })}</h2>
+          {live.me ? (
+            <button type="button" className="HangoutLinkButton" onclick={() => this.send('who')}>
+              {t('who.full')}
+            </button>
+          ) : null}
+        </div>
+        {live.who.length ? WhoTable({ live, people: live.who.slice(0, 12) }) : <p className="HangoutEmpty">{t('who.empty')}</p>}
+        {live.who.length > 12 ? <p className="HangoutEmpty">{t('who.more', { count: live.who.length - 12 })}</p> : null}
+      </div>
+    );
+  }
+
+  logPanel() {
+    const live = this.live;
+    const tabs: Tab[] = live.me ? ['room', 'tells'] : ['room'];
+    return (
+      <div className="HangoutCard HangoutLogPanel">
+        <div className="HangoutTabs" role="tablist">
+          {tabs.map((tab) => (
+            <button
+              type="button"
+              role="tab"
+              aria-selected={live.tab === tab}
+              className={classList('HangoutTab', live.tab === tab && 'is-active')}
+              onclick={() => this.switchTab(tab)}
+            >
+              {t('tabs.' + tab)}
+              {live.unread[tab] ? <span className="HangoutTab-badge">{live.unread[tab]}</span> : null}
+            </button>
+          ))}
+        </div>
+        <div className="HangoutLog" role="log" aria-live="polite">
+          {live.logs[live.tab].length ? (
+            live.logs[live.tab].map((line) => <div key={line.id}>{renderLine(live, line)}</div>)
+          ) : (
+            <p className="HangoutEmpty">{t(live.tab === 'tells' ? 'tabs.tells_empty' : 'tabs.room_empty')}</p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  cardView(c: Card) {
+    const live = this.live;
+    const rank = live.state?.ranks[c.rk];
+    const self = c.id === live.me?.id;
+    const now = Date.now() / 1000;
+    const local = live.state ? new Date((now + live.state.tz) * 1000) : null;
+    return (
+      <div className="HangoutMember" role="dialog" aria-label={fullName(c)}>
+        <button
+          type="button"
+          className="HangoutMember-close"
+          aria-label={tt('card.close')}
+          onclick={() => ((this.card = null), (this.cardId = null))}
+        >
+          ×
+        </button>
+        <div className="HangoutMember-top">
+          <span className="HangoutMember-avatar" style={{ background: c.col }}>
+            {c.av ? <img src={c.av} alt="" /> : (c.n || '?').charAt(0).toUpperCase()}
+          </span>
+          <div className="HangoutMember-who">
+            <strong className="HangoutMember-name">{fullName(c)}</strong>
+            {c.ti ? <span className="HangoutMember-title">{c.ti}</span> : null}
+            {rank ? (
+              <span className="HangoutMember-rank">
+                <span className="HangoutName-dot" style={{ background: rank.color }} />
+                {rank.name}
+              </span>
+            ) : null}
+          </div>
+        </div>
+        {c.fe ? <p className="HangoutMember-line">{t('card.feeling', { name: c.n, feeling: c.fe.toLowerCase() })}</p> : null}
+        {c.description ? <p className="HangoutMember-desc">{linkify(c.description)}</p> : null}
+        <p className="HangoutMember-line">
+          {c.con
+            ? t('card.here', { time: duration(now - c.con), room: c.room || live.state?.rooms.find((r) => r.id === c.r)?.name || '' })
+            : t('card.offline')}
+          {c.act && c.con ? ' · ' + tt('card.idle', { idle: idle(now - c.act) }) : ''}
+          {c.afk !== undefined && c.afk !== null ? ' · ' + tt(c.afk ? 'card.afk_reason' : 'card.afk', { reason: c.afk }) : ''}
+        </p>
+        {c.total ? <p className="HangoutMember-line">{t('card.total', { time: duration(c.total) })}</p> : null}
+        {local && c.con ? (
+          <p className="HangoutMember-line">
+            {t('card.clock', { time: local.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: 'UTC' }) })}
+          </p>
+        ) : null}
+        {live.me && !self ? (
+          <div className="HangoutMember-actions">
+            <button type="button" className="Button Button--primary" onclick={() => this.prefill(`tell ${c.u} `)}>
+              {t('card.tell')}
+            </button>
+            {live.people.has(c.id) ? (
+              <button
+                type="button"
+                className="Button"
+                onclick={() => {
+                  const p = live.people.get(c.id)!;
+                  this.stage?.walkSelf(Math.min((p.x || 0) + 1, (live.room?.w || 20) - 1), p.y || 0);
+                  this.card = null;
+                }}
+              >
+                {t('card.walk')}
+              </button>
+            ) : (
+              <button type="button" className="Button" onclick={() => this.prefill(`page ${c.u} `)}>
+                {t('card.page')}
+              </button>
+            )}
+            <button type="button" className="Button" onclick={() => this.send(`wave ${c.u}`)}>
+              {t('card.wave')}
+            </button>
+            <a className="Button" href={app.route('user', { username: c.s })}>
+              {t('card.profile')}
+            </a>
+          </div>
+        ) : (
+          <div className="HangoutMember-actions">
+            <a className="Button" href={app.route('user', { username: c.s })}>
+              {t('card.profile')}
+            </a>
+          </div>
+        )}
+        {c.post ? (
+          <p className="HangoutMember-post">
+            {t('card.latest', {
+              excerpt: <em>“{c.post.excerpt}”</em>,
+              discussion: <a href={app.route('discussion.near', { id: c.post.did, near: c.post.number })}>{c.post.discussion}</a>,
+            })}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
+
+  prefill(text: string) {
+    this.input = text;
+    this.card = null;
+    this.cardId = null;
+    requestAnimationFrame(() => document.querySelector<HTMLInputElement>('.HangoutBar-input')?.focus());
+  }
+
+  boardView() {
+    return (
+      <div className="HangoutMember HangoutBoard" role="dialog" aria-label={tt('board.title')}>
+        <button type="button" className="HangoutMember-close" aria-label={tt('card.close')} onclick={() => (this.boardOpen = false)}>
+          ×
+        </button>
+        <strong className="HangoutMember-name">{t('board.title')}</strong>
+        {this.board === null ? (
+          <LoadingIndicator size="small" />
+        ) : this.board.length ? (
+          <ul className="HangoutBoard-list">
+            {this.board.map((d: any) => (
+              <li>
+                <a href={app.route.discussion(d)}>{d.title()}</a>
+                <span className="HangoutBoard-meta">{d.user()?.displayName?.() || ''}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="HangoutEmpty">{t('board.empty')}</p>
+        )}
+      </div>
+    );
+  }
+}

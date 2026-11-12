@@ -1,0 +1,92 @@
+# Every check except the test suite, in ONE job: composer.json, PHP 8.3 syntax
+# (the oldest PHP Flarum 2 supports), Pint, PHPStan, and the JS checks and
+# production build, including that the committed js/dist matches a fresh build.
+#
+# This is a private repo, and GitHub bills private repos per job, each rounded
+# up to a whole minute. One job here replaces five (composer, style, JS bundle,
+# PHPStan and Flarum's shared frontend workflow).
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+    # Docs and screenshots change nothing the checks look at.
+    paths-ignore: ['**.md', '.github/screenshots/**', 'docs/**', 'LICENSE']
+  workflow_dispatch:
+
+# A newer push replaces a run still in progress instead of paying for both.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  COMPOSER_ROOT_VERSION: dev-main
+  COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
+
+jobs:
+  checks:
+    name: Checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+          extensions: curl, dom, gd, json, mbstring, openssl, pdo_mysql, pdo_pgsql, tokenizer, zip
+          tools: composer:v2
+
+      - name: Validate composer.json
+        run: composer validate --strict
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --no-progress
+
+      - name: PHP 8.3 syntax
+        run: find src extend.php migrations -name '*.php' -print0 2>/dev/null | xargs -0 -n1 -P4 php -l > /dev/null
+
+      - name: Code style (Pint)
+        run: '[ ! -x vendor/bin/pint ] || vendor/bin/pint --test'
+
+      - name: PHPStan
+        run: |
+          sudo systemctl start mysql
+          mysql -uroot -proot -e 'CREATE DATABASE flarum_test;'
+          composer analyse:phpstan
+        env:
+          DB_USERNAME: root
+          DB_PASSWORD: root
+          DB_PORT: 3306
+          COMPOSER_PROCESS_TIMEOUT: 600
+          FLARUM_TEST_TMP_DIR_LOCAL: ./tmp
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: js/package-lock.json
+
+      - name: JS checks and production build
+        working-directory: js
+        run: |
+          npm ci
+          npm run format-check
+          npm run check-typings
+          npm run --if-present check-typings-coverage
+          npm run build
+
+      # js/dist is committed and is what forums load. If a build from the
+      # committed source produces different bytes, the shipped bundle is not
+      # the shipped source.
+      - name: Fail if the committed bundle is stale
+        run: |
+          if ! git diff --quiet -- js/dist; then
+            echo "js/dist differs from a fresh build of js/src: run 'npm run build' in js/ and commit." >&2
+            git diff --stat -- js/dist
+            exit 1
+          fi

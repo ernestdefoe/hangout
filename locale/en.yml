@@ -1,0 +1,234 @@
+ernestdefoe-hangout:
+  forum:
+    nav: Hangout
+    page:
+      title: Hangout
+      description: Walk between rooms and chat with whoever is around, in the spirit of the old telnet talkers.
+    head:
+      here: "{count, plural, one {# here} other {# here}}"
+      doors: "doors to {doors}"
+    stage:
+      label: The room and the people in it
+      hint: Tap the floor to walk · tap someone for their card · arrow keys walk too
+      hint_guest: You're looking in from outside. Log in to walk in and talk.
+    emotes:
+      label: Quick feelings
+      wave: Wave
+      laugh: Laugh
+      dance: Dance
+      sit: Sit
+      hug: Hug
+      more: More…
+    bar:
+      label: Say something, or type a command
+      placeholder: "Say something to {room}… (or type help)"
+      say: Say
+      guest: Log in to walk in and talk.
+      cannot_talk: You can look around, but you can't talk here.
+      log_in: Log in
+    who:
+      title: "Who's on · {count}"
+      full: Full list
+      empty: Nobody is here right now.
+      more: "and {count} more (type who)"
+    tabs:
+      room: Room
+      tells: Tells
+      room_empty: It's quiet. Say hello!
+      tells_empty: Pages and tells sent to you show up here. Try "tell name = hi".
+    card:
+      close: Close
+      feeling: "{name} is feeling {feeling}."
+      here: "Here {time}, in {room}"
+      offline: Not connected right now
+      idle: "idle {idle}"
+      afk: away
+      afk_reason: "away: {reason}"
+      total: "{time} in the Hangout in all"
+      clock: "It's {time} on the forum's clock."
+      tell: Tell
+      page: Page
+      walk: Walk over
+      wave: Wave
+      profile: Profile
+      latest: "Latest post: {excerpt} in {discussion}"
+    board:
+      title: Notice board · newest discussions
+      empty: Nothing posted yet.
+    idle:
+      now: now
+      m: "{n}m"
+      h: "{n}h"
+      d: "{n}d"
+      afk: afk
+    duration:
+      hm: "{h}h {m}m"
+      m: "{m}m"
+    errors:
+      generic: Something went wrong. Try again in a moment.
+      permission_denied: You don't have permission to do that.
+      slow_down: "Slow down a little: you're talking faster than the room allows."
+      usage: "Usage: {usage}"
+      rank_cannot: Your rank can't do that.
+      not_connected: "{name} isn't connected right now."
+      moron_page: Morons can only page and tell staff (Apprentice Wizards and Druids and above).
+      page_wait: "Please wait {seconds, plural, one {# second} other {# seconds}} before sending them another message."
+      nothing_to_reply: Nobody has paged or told you anything to reply to yet.
+      no_such_person: "There's nobody called {name} here."
+      no_exit: "There's no way out called {name} here."
+      room_locked: "{room} is locked right now."
+      no_such_mood: "{name} isn't one of the feelings. Type feeling list to see them all."
+      no_rooms: The Hangout has no rooms yet.
+      shout_wait: "You can shout again in {minutes, plural, one {# minute} other {# minutes}}."
+    line:
+      says: "{name} says, “{text}”"
+      asks: "{name} asks, “{text}”"
+      exclaims: "{name} exclaims, “{text}”"
+      you_says: "You say, “{text}”"
+      you_asks: "You ask, “{text}”"
+      you_exclaims: "You exclaim, “{text}”"
+      think: "{name} thinks . o O ( {text} )"
+      afar: "From afar: {text}"
+      enter: "{name} arrives."
+      enter_from: "{name} arrives from {room}."
+      leave: "{name} goes to {room}."
+      connect: "{name} has connected."
+      disconnect: "{name} has disconnected."
+      lost: "{name} has lost their connection."
+      afk: "{name} is away."
+      afk_reason: "{name} is away: {reason}"
+      back: "{name} is back."
+      page: "{name} pages you from {loc}: {text}"
+      page_group: "{name} pages you and {others} from {loc}: {text}"
+      page_sent: "You page {to}: {text}"
+      tell: "{name} tells you, “{text}”"
+      tell_group: "{name} tells you and {others}, “{text}”"
+      tell_sent: "You tell {to}, “{text}”"
+      remote: "From afar, {name} {text}"
+      remote_group: "From afar (to you and {others}), {name} {text}"
+      remote_sent: "To {to}, from afar: {name} {text}"
+      shout: "{name} shouts, “{text}”"
+      yell: "{name} yells across {area}, “{text}”"
+    out:
+      unknown: "Sorry, “{command}” isn't a command. Type help for a list."
+      usage: "Usage: {usage}"
+      exits: "Ways out: {exits}"
+      none: none
+      here: "Here: {people}"
+      alone: You're on your own here.
+      is_feeling: "is feeling {feeling}"
+      no_description: They haven't described themselves yet.
+      recall_title: The last pages and tells sent to you
+      recall_hint: Reply with reply = message, or page 2 = message to answer the second one.
+      recall_none: Nobody has paged or told you anything yet.
+      feelings_title: Feelings
+      feelings_hint: "Try wave, wave Ben, wave happily at Ben, or hug Ben = tightly."
+      moods_title: "Moods for feeling <mood>"
+      arrived: "You go to {room}."
+      reconnected: You were away a long time, so you've been connected again.
+      home: "You go home to {room}."
+      home_set: "{room} is your home now: you'll connect here."
+      back: Welcome back.
+      time: "It's {time} on the forum's clock."
+      title_set: "Your title is now “{value}”."
+      title_set_reset: Your title is cleared.
+      prefix_set: "Your name prefix is now “{value}”."
+      prefix_set_reset: Your name prefix is cleared.
+      suffix_set: "Your name suffix is now “{value}”."
+      suffix_set_reset: Your name suffix is cleared.
+      description_set: Your description is saved. Others see it when they look at you.
+      description_set_reset: Your description is cleared.
+      cmessage_set: "When you connect, everyone sees “{value}”."
+      cmessage_set_reset: Your connect message is cleared.
+      dmessage_set: "When you leave, everyone sees “{value}”."
+      dmessage_set_reset: Your disconnect message is cleared.
+      feeling_set: "You're feeling {value} now."
+      feeling_set_reset: Your feeling is cleared.
+    help:
+      title: Commands
+      tokens: "Shortcuts: \"hello says it, :waves emotes, +hmm thinks, >ben hi tells, <ben waves remotes. Arrow keys walk; Enter jumps here."
+      usage:
+        say: say <message>
+        emote: ":<action>  (emote, pose)"
+        think: think <thought>
+        feelings: feelings
+        page: "page <name>[,<name>] = <message>"
+        tell: "tell <name>[,<name>] = <message>"
+        remote: "remote <name> = <action>"
+        recall: recall
+        reply: reply <message>
+        who: who [name]
+        look: look [name]
+        go: go <exit>
+        home: home · sethome
+        afk: afk [reason] · back
+        title: title <text>
+        prefix: prefix <text> · suffix <text>
+        describe: describe <text>
+        feeling: feeling <mood> · moods
+        cmessage: cmessage <text> · dmessage <text>
+        colour: "colour #e8833a"
+        time: time
+        quit: quit
+      what:
+        say: Talk to the room. A speech bubble pops up over you.
+        emote: "Do something: “:waves hello” shows “Ernest waves hello”."
+        think: A thought bubble.
+        feelings: "Every feeling command: wave, hug, ack, aha, baa, moose…"
+        page: A short message to people in any room.
+        tell: A private message to people in any room.
+        remote: Act at someone from afar.
+        recall: The last eight pages and tells sent to you.
+        reply: Answer whoever last paged or told you.
+        who: Everyone connected, with titles, rooms and idle times.
+        look: The room, or a person's card.
+        go: Go through a door, by name.
+        home: Go home, or make this room your home.
+        afk: Mark yourself away. Doing anything brings you back.
+        title: The words after your name on the who list.
+        prefix: Words before or after your name.
+        describe: What people see when they look at you.
+        feeling: How you're feeling, on your card.
+        cmessage: What everyone sees when you connect or leave.
+        colour: Your clothes' colour.
+        time: The time on the forum's clock.
+        quit: Leave the Hangout.
+  admin:
+    settings:
+      nav: Show Hangout in the forum's navigation
+      ranks: Ranks
+      ranks_help: "TCZ's ranks. A member holds the highest rank of any group they're in; members in none are Mortals. Moron is the punishment rank and wins over every other. Apprentices and up shout without waiting and can page anyone; Morons can only page staff."
+      rank: Rank
+      rank_name: Name
+      rank_color: Colour
+      rank_group: Group
+      no_group: No group
+      mortal_group: Everyone else
+      say_per_minute: Lines per minute
+      say_per_minute_help: How many things a member can say, emote or page in a minute. Apprentices and up get three times as many.
+      shout_minutes: Minutes between shouts
+      shout_minutes_help: How long a Mortal waits between shouts. Apprentices and up never wait. 0 means no wait.
+      idle_minutes: Idle after (minutes)
+      idle_minutes_help: When someone starts to doze on the who list and in the room.
+      keep_days: Keep talk for (days)
+      keep_days_help: Older room talk, pages and tells are forgotten.
+      timezone: The forum's clock
+      timezone_help: "A time zone such as America/Chicago, for the sky and the time command. Empty uses the server's."
+    ranks:
+      deity: Deity
+      elder_wizard: Elder Wizard
+      elder_druid: Elder Druid
+      wizard: Wizard
+      druid: Druid
+      apprentice_wizard: Apprentice Wizard
+      apprentice_druid: Apprentice Druid
+      retired: Retired
+      experienced: Experienced Builder
+      assistant: Assistant
+      builder: Builder
+      mortal: Mortal
+      moron: Moron
+    permissions:
+      view: Look in on the Hangout
+      talk: Walk in and talk in the Hangout
+      shout: Shout to the whole Hangout

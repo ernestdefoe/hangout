@@ -1,0 +1,92 @@
+# The test suite in ONE job, on PHP 8.5 (what Ernest's forums run) against
+# MariaDB 11.8 (his forums' database) and PostgreSQL 18 (the Mailwright site's),
+# both with a table prefix, which is the stricter case. PHP 8.3 compatibility is
+# checked by the syntax check and PHPStan in ci.yml.
+#
+# This is a private repo, and GitHub bills private repos per job, each rounded
+# up to a whole minute; this replaces a four-job matrix. Public repos keep
+# Flarum's full shared matrix, which is free.
+
+name: Hangout PHP
+
+on:
+  push:
+    branches: [main]
+    # Docs and screenshots change nothing the checks look at.
+    paths-ignore: ['**.md', '.github/screenshots/**', 'docs/**', 'LICENSE']
+  workflow_dispatch:
+
+# A newer push replaces a run still in progress instead of paying for both.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  COMPOSER_ROOT_VERSION: dev-main
+  FLARUM_TEST_TMP_DIR_LOCAL: tests/integration/tmp
+  DB_DATABASE: flarum_test
+  DB_USERNAME: flarum
+  DB_PASSWORD: password
+  DB_HOST: 127.0.0.1
+  COMPOSER_PROCESS_TIMEOUT: 600
+  COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
+
+jobs:
+  test:
+    name: Tests (PHP 8.5, MariaDB 11.8 and PostgreSQL 18)
+    runs-on: ubuntu-latest
+
+    services:
+      mariadb:
+        image: mariadb:11.8
+        env:
+          MARIADB_DATABASE: flarum_test
+          MARIADB_USER: flarum
+          MARIADB_PASSWORD: password
+          MARIADB_ROOT_PASSWORD: root
+        ports:
+          - 3306
+        options: --health-cmd="healthcheck.sh --connect" --health-interval=10s --health-timeout=5s --health-retries=10
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: flarum_test
+          POSTGRES_USER: flarum
+          POSTGRES_PASSWORD: password
+        ports:
+          - 5432
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          coverage: none
+          extensions: curl, dom, gd, json, mbstring, openssl, pdo_mysql, pdo_pgsql, tokenizer, zip
+          tools: composer:v2
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --no-progress
+
+      - name: MariaDB 11.8 (prefix)
+        run: |
+          rm -rf tests/integration/tmp
+          composer test:setup
+          composer test
+        env:
+          DB_DRIVER: mariadb
+          DB_PORT: ${{ job.services.mariadb.ports['3306'] }}
+          DB_PREFIX: flarum_c_
+
+      - name: PostgreSQL 18 (prefix)
+        if: success() || failure()
+        run: |
+          rm -rf tests/integration/tmp
+          composer test:setup
+          composer test
+        env:
+          DB_DRIVER: pgsql
+          DB_PORT: ${{ job.services.postgres.ports['5432'] }}
+          DB_PREFIX: flarum_p
