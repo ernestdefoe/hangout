@@ -50,7 +50,9 @@
   &-button {
     flex: none; min-height: 44px; padding: 0 16px; border: 0; border-radius: 10px; cursor: pointer;
     background: var(--control-bg); color: var(--control-color); font-weight: 600; font-size: 14px;
-    &:hover, &:focus-visible { background: var(--control-bg-shaded, var(--control-bg)); color: var(--text-color); }
+    &:focus-visible { background: var(--control-bg-shaded, var(--control-bg)); color: var(--text-color); }
+    // Real hover only: on a phone a tapped button would keep its hover colour.
+    @media (hover: hover) { &:hover { background: var(--control-bg-shaded, var(--control-bg)); color: var(--text-color); } }
   }
 }
 
