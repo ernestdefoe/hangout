@@ -140,7 +140,9 @@ export default class HangoutPage extends Page {
     const nav = document.querySelector<HTMLElement>('#app-navigation, .App-navigation');
     const navRect = nav && getComputedStyle(nav).display !== 'none' ? nav.getBoundingClientRect() : null;
     // Where the top bar ends inside what you can see: iOS scrolls it away while typing, Android keeps it.
-    const top = Math.max(0, navRect && navRect.bottom - offset > 0 && navRect.bottom - offset < viewH / 2 ? navRect.bottom - offset : 0);
+    let top = Math.max(0, navRect && navRect.bottom - offset > 0 && navRect.bottom - offset < viewH / 2 ? navRect.bottom - offset : 0);
+    // (Only while the page is not panned: elementsFromPoint works in layout coordinates.)
+    if (offset < 1) top = this.belowFixedBars(top, viewH);
     // The keyboard is up when a field has focus and the view is well short of the tallest
     // it has been (iOS 26 Safari shrinks innerHeight too, so innerHeight can't be the baseline).
     const focused = /INPUT|TEXTAREA/.test(document.activeElement?.tagName || '');
@@ -152,6 +154,32 @@ export default class HangoutPage extends Page {
     root.style.setProperty('--hangout-top', `${Math.round(offset + top)}px`);
     root.style.setProperty('--hangout-height', `${Math.max(200, Math.round(viewH - top - tabH))}px`);
   };
+
+  /**
+   * Other extensions pin their own bars under the header (a score ticker, an
+   * announcement strip). Step down past any fixed or sticky element at the top
+   * edge, so the Hangout starts below all of them.
+   */
+  belowFixedBars(top: number, viewH: number): number {
+    const x = window.innerWidth / 2;
+    for (let i = 0; i < 6; i++) {
+      const bar = document.elementsFromPoint(x, top + 1).find((el) => {
+        if (el.closest('.HangoutApp') || el === document.body || el === document.documentElement) return false;
+        for (let n: Element | null = el; n && n !== document.body; n = n.parentElement) {
+          const pos = getComputedStyle(n).position;
+          if (pos === 'fixed' || pos === 'sticky') return n.getBoundingClientRect().height < viewH / 3;
+        }
+        return false;
+      });
+      if (!bar) break;
+      let n: Element = bar;
+      while (n.parentElement && !['fixed', 'sticky'].includes(getComputedStyle(n).position)) n = n.parentElement;
+      const bottom = n.getBoundingClientRect().bottom;
+      if (bottom <= top + 1 || bottom > viewH / 2) break;
+      top = bottom;
+    }
+    return top;
+  }
 
   /** Focus changes settle after the keyboard animates; measure again then. */
   fitSoon = () => {
