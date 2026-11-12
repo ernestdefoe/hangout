@@ -396,16 +396,20 @@ final class World
         $taken = $q->get(['x', 'y'])->map(fn ($p) => (int) $p->y * 256 + (int) $p->x)->flip()->all();
         $w = (int) $room->width;
         $h = (int) $room->height;
-        for ($r = 0; $r < max($w, $h); $r++) {
-            for ($dy = -$r; $dy <= $r; $dy++) {
-                for ($dx = -$r; $dx <= $r; $dx++) {
-                    if (max(abs($dx), abs($dy)) !== $r) {
-                        continue;
-                    }
-                    [$x, $y] = [$start[0] + $dx, $start[1] + $dy];
-                    $k = $y * 256 + $x;
-                    if ($x >= 0 && $y >= 0 && $x < $w && $y < $h && ! isset($blocked[$k]) && ! isset($taken[$k])) {
-                        return [$x, $y];
+        // A free start tile is honoured. Otherwise prefer tiles not straight in front of or
+        // behind someone (a person is taller than a tile, so they'd hide each other), then any free tile.
+        $free = fn (int $x, int $y) => $x >= 0 && $y >= 0 && $x < $w && $y < $h && ! isset($blocked[$y * 256 + $x]) && ! isset($taken[$y * 256 + $x]);
+        $clear = fn (int $x, int $y) => $free($x, $y) && ! isset($taken[($y - 1) * 256 + $x]) && ! isset($taken[($y + 1) * 256 + $x]);
+        if ($free($start[0], $start[1])) {
+            return $start;
+        }
+        foreach ([$clear, $free] as $ok) {
+            for ($r = 1; $r < max($w, $h); $r++) {
+                for ($dy = -$r; $dy <= $r; $dy++) {
+                    for ($dx = -$r; $dx <= $r; $dx++) {
+                        if (max(abs($dx), abs($dy)) === $r && $ok($start[0] + $dx, $start[1] + $dy)) {
+                            return [$start[0] + $dx, $start[1] + $dy];
+                        }
                     }
                 }
             }

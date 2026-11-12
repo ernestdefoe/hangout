@@ -477,13 +477,17 @@ export default class Stage {
       taken.add(Math.round(a.y) * 256 + Math.round(a.x));
     }
     const r = this.room!;
-    for (let d = 0; d < Math.max(r.w, r.h); d++) {
-      for (let dy = -d; dy <= d; dy++) {
-        for (let dx = -d; dx <= d; dx++) {
-          if (Math.max(Math.abs(dx), Math.abs(dy)) !== d) continue;
-          const tx = x + dx;
-          const ty = y + dy;
-          if (this.walkable(tx, ty) && !taken.has(ty * 256 + tx)) return [tx, ty];
+    // Same rule as the server (World::nearestFree): a free tile is honoured; otherwise prefer
+    // one not straight in front of or behind someone, then any free one.
+    const free = (tx: number, ty: number) => this.walkable(tx, ty) && !taken.has(ty * 256 + tx);
+    const clear = (tx: number, ty: number) => free(tx, ty) && !taken.has((ty - 1) * 256 + tx) && !taken.has((ty + 1) * 256 + tx);
+    if (free(x, y)) return [x, y];
+    for (const ok of [clear, free]) {
+      for (let d = 1; d < Math.max(r.w, r.h); d++) {
+        for (let dy = -d; dy <= d; dy++) {
+          for (let dx = -d; dx <= d; dx++) {
+            if (Math.max(Math.abs(dx), Math.abs(dy)) === d && ok(x + dx, y + dy)) return [x + dx, y + dy];
+          }
         }
       }
     }
