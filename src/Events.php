@@ -21,6 +21,9 @@ final class Events
 {
     public const HEAD = 'ernestdefoe-hangout.head';
 
+    /** @var array<int, array{0: int[], 1: array<string, mixed>}> pushes waiting for the response to finish */
+    private array $pushes = [];
+
     public function __construct(
         private readonly ConnectionInterface $db,
         private readonly Cache $cache,
@@ -203,8 +206,24 @@ final class Events
             default => [],
         };
         $ids = array_values(array_unique(array_merge(array_map('intval', $ids), $inbox)));
-        if ($ids) {
-            $this->container->make(Dispatcher::class)->dispatch(new Push($ids, $event));
+        if (! $ids) {
+            return;
         }
+        // Under php-fpm: after the response has gone out, so nobody waits on the
+        // daemon and nobody waits on the queue either (a queued push took ~3 s).
+        if (PHP_SAPI === 'fpm-fcgi' && function_exists('fastcgi_finish_request')) {
+            if (! $this->pushes) {
+                register_shutdown_function(function () {
+                    fastcgi_finish_request();
+                    foreach ($this->pushes as [$userIds, $payload]) {
+                        (new Push($userIds, $payload))->handle($this->container);
+                    }
+                });
+            }
+            $this->pushes[] = [$ids, $event];
+
+            return;
+        }
+        $this->container->make(Dispatcher::class)->dispatch(new Push($ids, $event));
     }
 }
