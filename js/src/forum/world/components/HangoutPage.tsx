@@ -324,6 +324,26 @@ export default class HangoutPage extends Page {
 
   view() {
     const live = this.live;
+    // Not allowed in (a guest where guests can't look, a suspended member): one plain card, not an empty world.
+    if (!live.loading && !live.state) {
+      this.stage?.destroy();
+      this.stage = live.stage = null;
+      return (
+        <div className="HangoutPage-wrap">
+          <PageStructure className="HangoutPage">
+            <div className="HangoutCard HangoutDenied">
+              <h1 className="HangoutHead-title">{tt('page.title')}</h1>
+              <p>{app.session.user ? live.error : t('bar.guest')}</p>
+              {!app.session.user ? (
+                <Button className="Button Button--primary" onclick={() => app.modal.show(() => import('flarum/forum/components/LogInModal'))}>
+                  {t('bar.log_in')}
+                </Button>
+              ) : null}
+            </div>
+          </PageStructure>
+        </div>
+      );
+    }
     const room = live.room;
     const here = room ? [...live.people.values()].filter((p) => !p.inv || p.id === live.me?.id).length : 0;
     return (

@@ -264,3 +264,9 @@ html:not(#x-hi) .HangoutDoor {
   }
   &-menu { display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 0 6px; }
 }
+
+// Not allowed in: one card instead of an empty world.
+html:not(#x-hi) .HangoutDenied {
+  max-width: 520px; margin: 40px auto; padding: 24px; text-align: center; color: var(--text-color);
+  p { margin: 10px 0 18px; color: var(--muted-color); }
+}
