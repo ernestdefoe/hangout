@@ -216,7 +216,8 @@ final class Commands
 
     // ── talking in the room ─────────────────────────────────────
 
-    private function limit(Ctx $ctx): void
+    /** Talking speed: the admin's lines a minute (staff three times that). Channels and the room share it. */
+    public function limit(Ctx $ctx): void
     {
         $per = Ranks::level($ctx->rank) >= 7 ? $this->settings->sayPerMinute() * 3 : $this->settings->sayPerMinute();
         $key = 'ernestdefoe-hangout.talk.'.$ctx->actor->id.'.'.intdiv(time(), 60);

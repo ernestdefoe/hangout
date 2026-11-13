@@ -132,4 +132,15 @@ class SocialTest extends TestCase
         $this->assertSame(403, $this->api('POST', '/bbs', 3, ['delete' => $note['id']])[0]);
         $this->assertSame(200, $this->api('POST', '/bbs', 5, ['delete' => $note['id']])[0]);
     }
+
+    #[Test]
+    public function channels_share_the_rooms_talking_speed(): void
+    {
+        $this->setting('ernestdefoe-hangout.say_per_minute', 2);
+        $this->api('GET', '', 2);
+        $this->act(2, 'channel join gaming');
+        $this->act(2, '-gaming one');
+        $this->act(2, '-gaming two');
+        $this->assertSame('hangout_slow_down', $this->code($this->act(2, '-gaming three')), 'a channel can\'t be flooded');
+    }
 }

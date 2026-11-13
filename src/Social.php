@@ -33,7 +33,7 @@ final class Social
     {
         $commands->register('shout', fn (Ctx $c, string $a) => $this->shout($c, $a));
         $commands->register('yell', fn (Ctx $c, string $a) => $this->yell($c, $a));
-        $commands->register('chat', fn (Ctx $c, string $a) => $this->chat($c, $a));
+        $commands->register('chat', fn (Ctx $c, string $a) => $this->chat($c, $a, $commands));
         $commands->register('channel', fn (Ctx $c, string $a) => $this->channel($c, $a));
         $commands->register('channels', fn (Ctx $c, string $a) => $this->channel($c, 'list'));
         $commands->register('friend', fn (Ctx $c, string $a) => $this->relation($c, 'friend', $a));
@@ -130,7 +130,7 @@ final class Social
     }
 
     /** `-gaming hello` or `chat gaming hello`: talk on a channel; with only one channel, the name can be left out. */
-    private function chat(Ctx $ctx, string $args): void
+    private function chat(Ctx $ctx, string $args, Commands $commands): void
     {
         $mine = $this->channelIds((int) $ctx->actor->id);
         $parts = preg_split('/\s+/', trim($args), 2) ?: [];
@@ -147,6 +147,7 @@ final class Social
         if ($text === '') {
             throw new HangoutException('usage', 422, ['usage' => '-<channel> <message>']);
         }
+        $commands->limit($ctx);
         $emote = str_starts_with($text, ':');
         $ctx->events[] = $this->events->write([
             'audience' => 'chan', 'kind' => 'chan', 'channel_id' => (int) $channel->id, 'actor_id' => (int) $ctx->actor->id,
