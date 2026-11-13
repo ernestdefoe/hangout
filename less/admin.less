@@ -5,7 +5,20 @@
   .FormControl { min-width: 0; }
 }
 .HangoutAdmin-color.FormControl { width: 56px; padding: 2px; height: 36px; }
+// Phones: each rank is a small card (name and colour on one line, group under it) instead of a table to scroll sideways.
 @media (max-width: 767.98px) {
-  .HangoutAdmin-ranks { overflow-x: auto; }
-  .HangoutAdmin-table { min-width: 560px; }
+  .HangoutAdmin-table {
+    thead { display: none; }
+    tbody, tr, td { display: block; }
+    tr {
+      display: grid; grid-template-columns: minmax(0, 1fr) 56px; gap: 6px;
+      padding: 10px 0; border-top: 1px solid var(--control-bg);
+    }
+    td { padding: 0; min-width: 0; }
+    td:first-child { grid-column: ~"1 / -1"; font-weight: 600; }
+    td:last-child { grid-column: ~"1 / -1"; }
+    select.FormControl, input.FormControl:not(.HangoutAdmin-color) { width: 100%; }
+    // Phones grow the font to 16px; a fixed-height select then cut its text off.
+    select.FormControl { height: auto; line-height: 1.4; padding-top: 7px; padding-bottom: 7px; }
+  }
 }

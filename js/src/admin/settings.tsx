@@ -71,7 +71,12 @@ export function settingsPage(): void {
     })
     .registerPermission({ permission: 'ernestdefoe-hangout.view', icon: 'fas fa-couch', label: t('permissions.view'), allowGuest: true }, 'view', 60)
     .registerPermission({ permission: 'ernestdefoe-hangout.talk', icon: 'fas fa-comment-dots', label: t('permissions.talk') }, 'reply', 60)
-    .registerPermission({ permission: 'ernestdefoe-hangout.shout', icon: 'fas fa-bullhorn', label: t('permissions.shout') }, 'reply', 59);
+    .registerPermission({ permission: 'ernestdefoe-hangout.shout', icon: 'fas fa-bullhorn', label: t('permissions.shout') }, 'reply', 59)
+    .registerPermission(
+      { permission: 'ernestdefoe-hangout.createChannels', icon: 'fas fa-hashtag', label: t('permissions.create_channels') },
+      'start',
+      58
+    );
 }
 
 /** One row per rank: the name and colour members see, and the Flarum group that holds it. */
