@@ -2,6 +2,8 @@
 
 A light 2D talker world inside your Flarum forum: a modern web rewrite of **The Chatting Zone (TCZ)**, the 1990s telnet talker. Members walk between rooms and chat in speech bubbles, with TCZ's own commands, feelings, ranks and who list. No telnet, no game engine: one canvas, one small art atlas, the forum's own members, groups and permissions.
 
+![The Lobby, with people talking](screenshots/lobby.jpg)
+
 ## What members get
 
 - **Rooms to walk around.** Click or tap the floor (or use the arrow keys) and you walk there; walk through a door to go to the next room. Four rooms out of the box: the Lobby, the Arcade, the Lounge and the Rooftop, with lighting that follows the forum's clock (the Rooftop's sky goes from sunny to starry).
@@ -16,6 +18,8 @@ A light 2D talker world inside your Flarum forum: a modern web rewrite of **The 
 - **Phones.** The room on top with a camera that follows you, feelings, the log, and the command bar above the keyboard.
 
 ## Keeping it civil
+
+![The ⋯ menu beside a message](screenshots/moderation.jpg)
 
 - **Report.** Every message has a ⋯ beside it. Report raises a Flarum flag, so it lands in the moderators' usual Flags list (needs **flarum/flags**). The report is a post in a hidden "Hangout reports" discussion that only staff can see, quoting the message as plain text.
 - **Remove.** Druids and up (and the Deity) take a message out of everyone's log and bubble, for good (`remove`, or the ⋯ menu).
