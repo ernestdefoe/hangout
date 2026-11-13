@@ -24,7 +24,7 @@ class OutsideTest extends TestCase
         $this->prepareDatabase([
             User::class => [
                 $this->normalUser(),
-                ['id' => 3, 'username' => 'dana', 'email' => 'dana@machine.local', 'is_email_confirmed' => 1],
+                ['id' => 3, 'username' => 'Dana', 'email' => 'dana@machine.local', 'is_email_confirmed' => 1],
                 ['id' => 4, 'username' => 'eli', 'email' => 'eli@machine.local', 'is_email_confirmed' => 1],
             ],
         ]);
@@ -76,7 +76,7 @@ class OutsideTest extends TestCase
     {
         $this->prepare();
         $this->api('GET', '/api/hangout', 2);
-        [$status, $body] = $this->tell(2, 'tell dana = hi');
+        [$status, $body] = $this->tell(2, 'tell Dana = hi');
         $this->assertSame(404, $status);
         $this->assertSame('hangout_not_connected', $body['errors'][0]['code']);
     }
@@ -87,7 +87,7 @@ class OutsideTest extends TestCase
         $this->setting('ernestdefoe-hangout.outside', 'off');
         $this->prepare('flarum-messages');
         $this->api('GET', '/api/hangout', 2);
-        $this->assertSame(404, $this->tell(2, 'tell dana = hi')[0]);
+        $this->assertSame(404, $this->tell(2, 'tell Dana = hi')[0]);
         $this->assertSame([], $this->dialogMessages());
     }
 
@@ -96,9 +96,9 @@ class OutsideTest extends TestCase
     {
         $this->prepare('flarum-messages');
         $head = $this->api('GET', '/api/hangout', 2)[1]['head'];
-        [$status, $body] = $this->tell(2, 'tell dana = see you at eight?');
+        [$status, $body] = $this->tell(2, 'tell Dana = see you at eight?');
         $this->assertSame(200, $status, json_encode($body));
-        $this->assertSame(['k' => 'outside_sent', 'names' => ['dana'], 'via' => 'messages'], $body['out'][0]);
+        $this->assertSame(['k' => 'outside_sent', 'names' => ['Dana'], 'via' => 'messages'], $body['out'][0]);
 
         $sent = $this->dialogMessages();
         $this->assertCount(1, $sent);
@@ -131,7 +131,7 @@ class OutsideTest extends TestCase
         $this->prepare('flarum-messages');
         $this->api('GET', '/api/hangout', 2);
         $this->api('GET', '/api/hangout', 3);
-        [$status, $body] = $this->tell(2, 'tell dana = hi');
+        [$status, $body] = $this->tell(2, 'tell Dana = hi');
         $this->assertSame(200, $status);
         $this->assertArrayNotHasKey('out', $body);
         $this->assertSame([], $this->dialogMessages());
@@ -145,7 +145,7 @@ class OutsideTest extends TestCase
         $this->tell(3, 'enemy add normal');
         $this->api('POST', '/api/hangout/leave', 3);
         $this->api('GET', '/api/hangout', 2);
-        [$status, $body] = $this->tell(2, 'tell dana = hi');
+        [$status, $body] = $this->tell(2, 'tell Dana = hi');
         $this->assertSame(403, $status);
         $this->assertSame('hangout_blocked', $body['errors'][0]['code']);
         $this->assertSame([], $this->dialogMessages());
@@ -156,8 +156,8 @@ class OutsideTest extends TestCase
     {
         $this->prepare('flarum-messages');
         $head = $this->api('GET', '/api/hangout', 2)[1]['head'];
-        $this->tell(2, 'tell dana = hi');
-        $this->tell(2, 'enemy add dana');
+        $this->tell(2, 'tell Dana = hi');
+        $this->tell(2, 'enemy add Dana');
         $dialog = $this->dialogMessages()[0]->dialog_id;
         $this->api('POST', '/api/dialog-messages', 3, ['data' => ['type' => 'dialog-messages',
             'attributes' => ['content' => 'hello?'],
@@ -171,7 +171,7 @@ class OutsideTest extends TestCase
     {
         $this->prepare('ernestdefoe-parley');
         $this->api('GET', '/api/hangout', 2);
-        [$status, $body] = $this->tell(2, 'tell dana = over here');
+        [$status, $body] = $this->tell(2, 'tell Dana = over here');
         $this->assertSame(200, $status, json_encode($body));
         $this->assertSame('parley', $body['out'][0]['via']);
         $messages = $this->db()->table('parley_messages')->get()->all();
@@ -186,7 +186,7 @@ class OutsideTest extends TestCase
         $this->prepare('ernestdefoe-parley', 'flarum-messages');
         $this->db()->table('parley_blocks')->insert(['user_id' => 3, 'blocked_id' => 2, 'created_at' => date('Y-m-d H:i:s')]);
         $this->api('GET', '/api/hangout', 2);
-        [$status, $body] = $this->tell(2, 'tell dana = hi');
+        [$status, $body] = $this->tell(2, 'tell Dana = hi');
         $this->assertSame(403, $status);
         $this->assertSame('hangout_outside_refused', $body['errors'][0]['code']);
         $this->assertSame(0, $this->db()->table('parley_messages')->count());
@@ -199,7 +199,7 @@ class OutsideTest extends TestCase
         $this->setting('ernestdefoe-hangout.outside', 'messages,parley,chat');
         $this->prepare('ernestdefoe-parley', 'flarum-messages');
         $this->api('GET', '/api/hangout', 2);
-        $this->assertSame('messages', $this->tell(2, 'tell dana = hi')[1]['out'][0]['via']);
+        $this->assertSame('messages', $this->tell(2, 'tell Dana = hi')[1]['out'][0]['via']);
         $this->assertSame(0, $this->db()->table('parley_messages')->count());
         $this->assertCount(1, $this->dialogMessages());
     }
@@ -210,7 +210,7 @@ class OutsideTest extends TestCase
         $this->setting('ernestdefoe-hangout.outside', 'parley');
         $this->prepare('flarum-messages');
         $this->api('GET', '/api/hangout', 2);
-        $this->assertSame(404, $this->tell(2, 'tell dana = hi')[0]);
+        $this->assertSame(404, $this->tell(2, 'tell Dana = hi')[0]);
         $this->assertSame([], $this->dialogMessages());
     }
 
@@ -219,7 +219,7 @@ class OutsideTest extends TestCase
     {
         $this->prepare('ramon-chat');
         $head = $this->api('GET', '/api/hangout', 2)[1]['head'];
-        [$status, $body] = $this->tell(2, 'tell dana = in the arcade');
+        [$status, $body] = $this->tell(2, 'tell Dana = in the arcade');
         $this->assertSame(200, $status, json_encode($body));
         $this->assertSame('chat', $body['out'][0]['via']);
         $row = $this->db()->table('hangout_outside')->first();
@@ -240,7 +240,7 @@ class OutsideTest extends TestCase
         $this->setting('ramon-chat.direct_messages_provider', 'messages');
         $this->prepare('ramon-chat', 'flarum-messages');
         $this->api('GET', '/api/hangout', 2);
-        $this->assertSame('messages', $this->tell(2, 'tell dana = hi')[1]['out'][0]['via']);
+        $this->assertSame('messages', $this->tell(2, 'tell Dana = hi')[1]['out'][0]['via']);
     }
 
     #[Test]

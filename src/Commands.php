@@ -710,7 +710,8 @@ final class Commands
     /** Look several names (or #ids) up at once, so find($name, true) doesn't query per name. */
     private function lookUp(array $names): void
     {
-        $names = array_map(fn ($n) => mb_strtolower(ltrim(trim($n), '#@')), $names);
+        // As typed: Postgres compares usernames case-sensitively, as find() always has.
+        $names = array_map(fn ($n) => ltrim(trim($n), '#@'), $names);
         $ids = array_filter($names, 'ctype_digit');
         $usernames = array_diff($names, $ids);
         if (! $names) {
@@ -718,7 +719,8 @@ final class Commands
         }
         $users = User::query()->where(fn ($q) => $q->whereIn('id', $ids ?: [0])->orWhereIn('username', $usernames ?: ['']))->get();
         foreach ($names as $name) {
-            $this->known[$name] = $users->first(fn (User $u) => ctype_digit($name) ? (int) $u->id === (int) $name : mb_strtolower((string) $u->username) === $name);
+            $lower = mb_strtolower($name);
+            $this->known[$lower] = $users->first(fn (User $u) => ctype_digit($name) ? (int) $u->id === (int) $name : mb_strtolower((string) $u->username) === $lower);
         }
     }
 
