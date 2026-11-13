@@ -229,6 +229,12 @@ export default class Stage {
     a.bubble = { text: text.length > 140 ? text.slice(0, 137) + '…' : text, think, born: now, until: now + Math.min(12000, 4000 + text.length * 70) };
   }
 
+  /** A removed message's bubble goes at once. */
+  clearBubble(id: number) {
+    const a = this.actors.get(id);
+    if (a) a.bubble = null;
+  }
+
   animate(id: number, anim: string, ms = 2400) {
     const a = this.actors.get(id);
     if (!a) return;

@@ -246,3 +246,21 @@ html:not(#x-hi) .HangoutDoor {
 @media (max-width: 767.98px) {
   html.Hangout-phone, html.Hangout-phone body { overflow: hidden; overscroll-behavior: none; }
 }
+
+// A message's ⋯ menu: report, and remove or mute for Druids and up.
+.HangoutMsg {
+  position: relative;
+  padding-right: 26px;
+  &-more {
+    position: absolute; top: 0; right: 0;
+    width: 24px; height: 22px; padding: 0; border: 0; border-radius: 4px;
+    background: transparent; color: var(--muted-color); font-size: 16px; line-height: 1; cursor: pointer;
+    opacity: 0.55;
+    &:focus-visible, &[aria-expanded="true"] { opacity: 1; background: var(--control-bg); color: var(--control-color); }
+  }
+  @media (hover: hover) {
+    &-more:not([aria-expanded="true"]):not(:focus-visible) { opacity: 0; }
+    &:hover &-more { opacity: 1; }
+  }
+  &-menu { display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 0 6px; }
+}

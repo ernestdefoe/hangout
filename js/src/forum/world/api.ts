@@ -81,7 +81,7 @@ export interface State {
   ranks: Record<string, Rank>;
   feelings: string[];
   head: number;
-  can: { talk: boolean; shout: boolean; staff: boolean; invisible: boolean; channels: boolean };
+  can: { talk: boolean; shout: boolean; staff: boolean; invisible: boolean; channels: boolean; moderate: boolean; report: boolean };
   rank: string;
   idle: number;
   tz: number;

@@ -19,6 +19,7 @@ use ErnestDefoe\Hangout\Console\PruneCommand;
 use ErnestDefoe\Hangout\HangoutServiceProvider;
 use ErnestDefoe\Hangout\Http\PageContent;
 use ErnestDefoe\Hangout\Notification\MailBlueprint;
+use ErnestDefoe\Hangout\World;
 use Flarum\Api\Context;
 use Flarum\Api\Resource\ForumResource;
 use Flarum\Api\Schema;
@@ -61,6 +62,12 @@ return [
     (new Extend\Event())
         ->listen(Deleted::class, function (Deleted $event) {
             resolve('db')->table('hangout_profiles')->where('partner_id', $event->user->id)->update(['partner_id' => null, 'partner_state' => null]);
+        }),
+
+    // Suspending someone (flarum/suspend) puts them out of the Hangout at once.
+    (new Extend\Event())
+        ->listen('Flarum\\Suspend\\Event\\Suspended', function ($event) {
+            resolve(World::class)->disconnect((int) $event->user->id);
         }),
 
     // The viewer's own permission: already loaded, so no query.

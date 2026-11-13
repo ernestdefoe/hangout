@@ -62,6 +62,8 @@ export default class Live {
   enemies = new Set<number>();
   mail: Mail[] | null = null;
   tab: Tab = 'room';
+  /** The log line whose ⋯ menu is open. */
+  menu: number | null = null;
   error: string | null = null;
   loading = true;
   stage: Stage | null = null;
@@ -300,6 +302,18 @@ export default class Live {
     const ignored = !!e.a && !mine && this.enemies.has(e.a);
 
     switch (e.k) {
+      case 'rm':
+        // A Druid removed a message: out of every log and off the stage.
+        for (const tab of Object.keys(this.logs)) this.logs[tab] = this.logs[tab].filter((l) => l.e?.i !== d.id);
+        if (d.who) stage?.clearBubble(d.who);
+        return;
+      case 'removed':
+        return;
+      case 'mute':
+      case 'unmute':
+        log = 'room';
+        if (!mine) app.alerts.show({ type: e.k === 'mute' ? 'error' : 'success' } as any, tt(`line.${e.k}d`, { name: d.n, m: d.m }));
+        break;
       case 'move':
         if (here && e.a && !mine) {
           const p = this.people.get(e.a);

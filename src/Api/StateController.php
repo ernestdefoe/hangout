@@ -5,6 +5,7 @@ namespace ErnestDefoe\Hangout\Api;
 use ErnestDefoe\Hangout\Access;
 use ErnestDefoe\Hangout\Events;
 use ErnestDefoe\Hangout\Feelings;
+use ErnestDefoe\Hangout\Moderation;
 use ErnestDefoe\Hangout\Ranks;
 use ErnestDefoe\Hangout\Settings;
 use ErnestDefoe\Hangout\Social;
@@ -26,6 +27,7 @@ class StateController extends Controller
         private readonly Ranks $ranks,
         private readonly Settings $settings,
         private readonly Social $social,
+        private readonly Moderation $moderation,
     ) {
     }
 
@@ -59,6 +61,8 @@ class StateController extends Controller
                 'shout' => $talk && $actor->can(Settings::SHOUT) && Ranks::can($rank, 'shout'),
                 'staff' => $talk && Ranks::can($rank, 'staff'),
                 'invisible' => $talk && Ranks::can($rank, 'invisible'),
+                'moderate' => $talk && Ranks::can($rank, 'moderate'),
+                'report' => $talk && $this->moderation->canReport(),
                 'channels' => $talk && ($actor->can('ernestdefoe-hangout.createChannels') || Ranks::can($rank, 'staff')),
             ],
             'rank' => $rank,

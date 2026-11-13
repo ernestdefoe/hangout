@@ -58,13 +58,82 @@ const COMMANDS = [
   'bbs',
   'alias',
   'partner',
+  'report',
   'quit',
 ];
+
+/** Only Druids and up see these in help. */
+const STAFF_COMMANDS = ['mute', 'remove'];
+
+/** Kinds of line that carry someone's words: they get a ⋯ menu (report; remove and mute for Druids). */
+const SPOKEN = ['say', 'emote', 'think', 'feel', 'shout', 'yell', 'chan', 'page', 'tell', 'remote'];
 
 /** One line of a log: an event, or the answer to one of our commands. */
 export function renderLine(live: Live, line: Line): Mithril.Children {
   if (line.out) return renderOut(live, line.out);
-  const e = line.e as HEvent;
+  const body = renderEvent(live, line.e as HEvent);
+  const menu = lineMenu(live, line.e as HEvent);
+  return menu ? (
+    <div className="HangoutMsg">
+      {body}
+      {menu}
+    </div>
+  ) : (
+    body
+  );
+}
+
+/** The ⋯ beside someone else's message: Report for everyone, Remove and Mute for Druids and up. */
+function lineMenu(live: Live, e: HEvent): Mithril.Children {
+  const can = live.state?.can;
+  if (!can || !e.a || e.a === live.me?.id || !SPOKEN.includes(e.k) || !(can.report || can.moderate)) return null;
+  const open = live.menu === e.i;
+  const name = e.d?.n || '';
+  const run = (line: string) => {
+    live.menu = null;
+    live.act(line);
+  };
+  const user = live.people.get(e.a)?.u || live.who.find((p) => p.id === e.a)?.u || `#${e.a}`;
+  const isPrivate = ['page', 'tell', 'remote'].includes(e.k);
+  return [
+    <button
+      type="button"
+      className="HangoutMsg-more"
+      aria-label={tt('menu.open')}
+      aria-expanded={open}
+      title={tt('menu.open')}
+      onclick={() => (live.menu = open ? null : e.i)}
+    >
+      ⋯
+    </button>,
+    open ? (
+      <div className="HangoutMsg-menu" role="group" aria-label={name}>
+        {can.report ? (
+          <button type="button" className="HangoutWord" onclick={() => run(`/report ${e.i}`)}>
+            {t('menu.report')}
+          </button>
+        ) : null}
+        {can.moderate && !isPrivate ? (
+          <button type="button" className="HangoutWord" onclick={() => run(`/remove ${e.i}`)}>
+            {t('menu.remove')}
+          </button>
+        ) : null}
+        {can.moderate
+          ? [
+              <button type="button" className="HangoutWord" onclick={() => run(`/mute ${user} 10`)}>
+                {t('menu.mute')}
+              </button>,
+              <button type="button" className="HangoutWord" onclick={() => run(`/mute ${user} 60`)}>
+                {t('menu.mute_hour')}
+              </button>,
+            ]
+          : null}
+      </div>
+    ) : null,
+  ];
+}
+
+function renderEvent(live: Live, e: HEvent): Mithril.Children {
   const d = e.d || {};
   const me = live.me?.id;
   const mine = !!me && e.a === me;
@@ -135,6 +204,11 @@ export function renderLine(live: Live, line: Line): Mithril.Children {
       return <div className="HangoutLine HangoutLine--private">{t(mine ? 'line.propose_sent' : 'line.propose', { name: who, to: to(d.to) })}</div>;
     case 'yell':
       return <div className="HangoutLine HangoutLine--shout">{t('line.yell', { name: who, text, area: d.area })}</div>;
+    case 'mute':
+    case 'unmute':
+      return (
+        <div className="HangoutLine HangoutLine--error">{t(mine ? `line.${e.k}d_sent` : `line.${e.k}d`, { name: who, to: to(d.to), m: d.m })}</div>
+      );
     default:
       return e.t ? <div className="HangoutLine">{text}</div> : null;
   }
@@ -188,10 +262,9 @@ function renderOut(live: Live, out: Record<string, any>): Mithril.Children {
         <div>
           <strong>{t('help.title')}</strong>
           <dl className="HangoutHelp">
-            {COMMANDS.filter((c) => out.topic === 'index' || c.startsWith(out.topic)).map((c) => [
-              <dt>{tt(`help.usage.${c}`)}</dt>,
-              <dd>{t(`help.what.${c}`)}</dd>,
-            ])}
+            {[...COMMANDS, ...(live.state?.can.moderate ? STAFF_COMMANDS : [])]
+              .filter((c) => out.topic === 'index' || c.startsWith(out.topic))
+              .map((c) => [<dt>{tt(`help.usage.${c}`)}</dt>, <dd>{t(`help.what.${c}`)}</dd>])}
           </dl>
           <p className="HangoutLine-hint">{t('help.tokens')}</p>
         </div>

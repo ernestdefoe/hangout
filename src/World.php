@@ -241,7 +241,8 @@ final class World
         $this->saveProfile((int) $user->id, ['last_connected_at' => $now]);
         $this->events->write([
             'audience' => 'all', 'kind' => 'connect', 'room_id' => (int) $room->id, 'actor_id' => (int) $user->id,
-            'body' => $profile->cmessage ?? null,
+            // A muted member's connect message stays unsaid.
+            'body' => $profile && ! ($profile->muted_until && strtotime((string) $profile->muted_until) > time()) ? $profile->cmessage : null,
             'data' => ['p' => $this->snapshot($user, $presence, $profile), 'room' => $room->name],
         ]);
         $this->cache->put('ernestdefoe-hangout.beat.'.$user->id, 1, self::BEAT);

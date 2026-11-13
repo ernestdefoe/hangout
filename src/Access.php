@@ -12,14 +12,15 @@ use Flarum\User\User;
  */
 final class Access
 {
+    /** A suspended member can't come in at all, not even to watch. */
     public static function canView(User $actor): bool
     {
-        return $actor->can('viewForum') && $actor->can(Settings::VIEW);
+        return $actor->can('viewForum') && $actor->can(Settings::VIEW) && ! self::suspended($actor);
     }
 
     public static function canTalk(User $actor): bool
     {
-        return ! $actor->isGuest() && self::canView($actor) && $actor->can(Settings::TALK) && ! self::suspended($actor);
+        return ! $actor->isGuest() && self::canView($actor) && $actor->can(Settings::TALK);
     }
 
     public static function suspended(User $actor): bool

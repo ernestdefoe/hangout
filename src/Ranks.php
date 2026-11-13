@@ -146,7 +146,8 @@ final class Ranks
             'shout_free' => $level >= 7,
             'shout', 'yell', 'page_anyone', 'emote' => $level >= 1,
             'staff' => $level >= 7,
-            'moderate' => $level >= 7 && in_array($ladder, ['druid', 'staff'], true),
+            // Druids and up: remove a message, mute someone (Apprentices learn first).
+            'moderate' => $level >= 8,
             'build' => $level >= 3 && $ladder !== 'druid' || $level >= 7,
             'invisible' => $level >= 10,
             default => false,

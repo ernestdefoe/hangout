@@ -58,6 +58,9 @@ final class Commands
     /** @var (callable(int, string): ?array<int, int>)|null */
     private $grouper = null;
 
+    /** @var (callable(Ctx, string, string): void)|null */
+    private $guard = null;
+
     /** @param callable(Ctx, string): void $handler */
     public function register(string $word, callable $handler): void
     {
@@ -74,6 +77,12 @@ final class Commands
     public function blockWith(callable $blocker): void
     {
         $this->blocker = $blocker;
+    }
+
+    /** A check before a command runs (a mute): handler name and arguments. */
+    public function guardWith(callable $guard): void
+    {
+        $this->guard = $guard;
     }
 
     /** Named groups of people to page at once ('friends'). */
@@ -108,18 +117,25 @@ final class Commands
             $aliased = true;
         }
 
-        if (isset($this->extra[$word])) {
-            ($this->extra[$word])($ctx, $args);
-        } elseif (isset(self::WORDS[$word]) && ($forced || $aliased || $this->commandLike($word, $args))) {
-            $this->{self::WORDS[$word]}($ctx, $args);
-        } elseif (($feeling = Feelings::find($word)) && ($forced || $aliased || $this->feelingLike($feeling, $args))) {
-            $this->feel($ctx, $feeling, $word, $args);
-        } elseif ($forced) {
-            $ctx->say('unknown', ['command' => $word]);
-        } else {
+        $feeling = null;
+        $handler = match (true) {
+            isset($this->extra[$word]) => $word,
+            isset(self::WORDS[$word]) && ($forced || $aliased || $this->commandLike($word, $args)) => self::WORDS[$word],
+            ($feeling = Feelings::find($word)) && ($forced || $aliased || $this->feelingLike($feeling, $args)) => 'feel',
+            $forced => 'unknown',
             // Anything else is just talking: "hello from my phone" is said, not TCZ's hello feeling.
-            $this->say($ctx, $line);
+            default => 'talk',
+        };
+        if ($this->guard) {
+            ($this->guard)($ctx, $handler === 'talk' ? 'say' : $handler, $args);
         }
+        match (true) {
+            isset($this->extra[$word]) => ($this->extra[$word])($ctx, $args),
+            $handler === 'feel' => $this->feel($ctx, (array) $feeling, $word, $args),
+            $handler === 'unknown' => $ctx->say('unknown', ['command' => $word]),
+            $handler === 'talk' => $this->say($ctx, $line),
+            default => $this->{$handler}($ctx, $args),
+        };
 
         return $ctx;
     }

@@ -5,6 +5,7 @@ namespace ErnestDefoe\Hangout\Api;
 use ErnestDefoe\Hangout\Access;
 use ErnestDefoe\Hangout\Commands;
 use ErnestDefoe\Hangout\HangoutException;
+use ErnestDefoe\Hangout\Moderation;
 use ErnestDefoe\Hangout\Ranks;
 use Flarum\User\User;
 use Illuminate\Contracts\Cache\Repository as Cache;
@@ -24,6 +25,7 @@ class BbsController extends Controller
         private readonly ConnectionInterface $db,
         private readonly Cache $cache,
         private readonly Ranks $ranks,
+        private readonly Moderation $moderation,
     ) {
     }
 
@@ -68,6 +70,7 @@ class BbsController extends Controller
 
             return ['ok' => true];
         }
+        $this->moderation->assertNotMuted($actor);
         $topic = $this->db->table('hangout_bbs_topics')->where('id', (int) ($body['topic'] ?? 0))->first();
         $subject = Commands::clean((string) ($body['subject'] ?? ''), 80);
         $text = mb_substr(trim(preg_replace('/[\x00-\x08\x0B-\x1F\x7F]/u', '', (string) ($body['body'] ?? '')) ?? ''), 0, 2000);

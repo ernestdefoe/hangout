@@ -124,6 +124,10 @@ ernestdefoe-hangout:
       no_proposal: Nobody has asked to be your partner.
       already_partnered: You already have a partner. Type partner end first.
       bbs_incomplete: A note needs a subject and some words.
+      muted: "You've been muted. You can talk again in {minutes, plural, one {# minute} other {# minutes}}."
+      outranked: You can only do that to people below your rank.
+      no_such_message: That message isn't there any more.
+      reports_off: Reporting needs the Flags extension, which this forum doesn't have turned on.
     line:
       says: "{name} says, “{text}”"
       asks: "{name} asks, “{text}”"
@@ -158,8 +162,20 @@ ernestdefoe-hangout:
       propose: "{name} asks if you'll be their partner. Type partner accept, or partner decline."
       propose_sent: "You ask {to} to be your partner."
       yell: "{name} yells across {area}, “{text}”"
+      muted: "{name} has muted you for {m, plural, one {# minute} other {# minutes}}. You can still look around and listen."
+      muted_sent: "You muted {to} for {m, plural, one {# minute} other {# minutes}}."
+      unmuted: "{name} has unmuted you. You can talk again."
+      unmuted_sent: "You unmuted {to}."
+    menu:
+      open: Message options
+      report: Report
+      remove: Remove
+      mute: Mute 10 min
+      mute_hour: Mute 1 hour
     out:
       unknown: "Sorry, “{command}” isn't a command. Type help for a list."
+      removed: Message removed.
+      reported: Thanks. The moderators have been told.
       usage: "Usage: {usage}"
       exits: "Ways out: {exits}"
       none: none
@@ -256,6 +272,9 @@ ernestdefoe-hangout:
         bbs: bbs
         alias: "alias <name> = <command>"
         partner: "partner <name> · partner accept · partner end"
+        report: "report: the ⋯ beside a message"
+        mute: "mute <name> [minutes] · unmute <name>"
+        remove: "remove: the ⋯ beside a message"
       what:
         say: Talk to the room. A speech bubble pops up over you.
         emote: "Do something: “:waves hello” shows “Ernest waves hello”."
@@ -287,6 +306,9 @@ ernestdefoe-hangout:
         bbs: The notice board in the Lobby.
         alias: Your own short commands.
         partner: "TCZ's 'net' partners: ask, accept, or part."
+        report: Tell the moderators about a message. It raises a flag for them.
+        mute: "Druids and up: stop someone talking for a while (10 minutes unless you say)."
+        remove: "Druids and up: take a message out of everyone's log."
   admin:
     settings:
       nav: Show Hangout in the forum's navigation
