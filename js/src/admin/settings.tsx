@@ -21,6 +21,8 @@ const RANKS: [string, string, string][] = [
   ['mortal', 'Mortal', '#cbd5e1'],
   ['moron', 'Moron', '#60a5fa'],
 ];
+/** Where pages and tells go for someone who isn't here (Outside::TARGETS). */
+const OUTSIDE = ['parley,chat,messages', 'chat,parley,messages', 'messages,parley,chat', 'parley', 'chat', 'messages', 'off'];
 const DEFAULT_GROUPS: Record<string, string> = { deity: '1', druid: '4' };
 
 export function settingsPage(): void {
@@ -68,6 +70,15 @@ export function settingsPage(): void {
       label: t('settings.timezone'),
       help: t('settings.timezone_help'),
       placeholder: 'America/Chicago',
+    })
+    .registerSetting({
+      setting: key('outside'),
+      type: 'select',
+      label: t('settings.outside'),
+      help: t('settings.outside_help'),
+      // String keys: an integer-like key would be sorted first.
+      options: Object.fromEntries(OUTSIDE.map((o) => [o, ts(`settings.outside_options.${o.replace(/,/g, '_')}`)])),
+      default: OUTSIDE[0],
     })
     .registerPermission({ permission: 'ernestdefoe-hangout.view', icon: 'fas fa-couch', label: t('permissions.view'), allowGuest: true }, 'view', 60)
     .registerPermission({ permission: 'ernestdefoe-hangout.talk', icon: 'fas fa-comment-dots', label: t('permissions.talk') }, 'reply', 60)

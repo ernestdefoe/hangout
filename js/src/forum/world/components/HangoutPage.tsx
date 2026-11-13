@@ -83,7 +83,9 @@ export default class HangoutPage extends Page {
     });
     live.stage = this.stage;
     live.start().then(() => {
-      if (new URLSearchParams(window.location.search).get('tab') === 'mail' && live.me) this.switchTab('mail');
+      // ?tab=mail from a mail alert, ?tab=tells from a whisper that went out as a message.
+      const tab = new URLSearchParams(window.location.search).get('tab');
+      if ((tab === 'mail' || tab === 'tells') && live.me) this.switchTab(tab);
     });
     document.addEventListener('keydown', this.keys);
     window.visualViewport?.addEventListener('resize', this.fitPhone);

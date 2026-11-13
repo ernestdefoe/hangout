@@ -19,6 +19,7 @@ use ErnestDefoe\Hangout\Console\PruneCommand;
 use ErnestDefoe\Hangout\HangoutServiceProvider;
 use ErnestDefoe\Hangout\Http\PageContent;
 use ErnestDefoe\Hangout\Notification\MailBlueprint;
+use ErnestDefoe\Hangout\Outside;
 use ErnestDefoe\Hangout\World;
 use Flarum\Api\Context;
 use Flarum\Api\Resource\ForumResource;
@@ -70,6 +71,22 @@ return [
             resolve(World::class)->disconnect((int) $event->user->id);
         }),
 
+    // An answer to a whisper that went out (ramon/chat, core Messages) comes back
+    // to the sender's Tells. Parley dispatches no event for a new message.
+    (new Extend\Event())
+        ->listen('Ramon\\Chat\\Event\\MessageWasSent', function ($event) {
+            $message = $event->message;
+            if ($message->user_id && $message->channel && $message->channel->type === 'direct') {
+                resolve(Outside::class)->relay('chat', (int) $message->channel_id, (int) $message->user_id, (string) $message->content);
+            }
+        })
+        ->listen('Flarum\\Messages\\DialogMessage\\Event\\Created', function ($event) {
+            $message = $event->message;
+            if ($message->user_id) {
+                resolve(Outside::class)->relay('messages', (int) $message->dialog_id, (int) $message->user_id, (string) $message->content);
+            }
+        }),
+
     // The viewer's own permission: already loaded, so no query.
     (new Extend\ApiResource(ForumResource::class))
         ->fields(fn () => [
@@ -85,6 +102,7 @@ return [
         ->default('ernestdefoe-hangout.say_per_minute', 30)
         ->default('ernestdefoe-hangout.idle_minutes', 5)
         ->default('ernestdefoe-hangout.keep_days', 7)
+        ->default('ernestdefoe-hangout.outside', 'parley,chat,messages')
         ->serializeToForum('hangoutNav', 'ernestdefoe-hangout.nav', 'boolval'),
 
     (new Extend\Console())

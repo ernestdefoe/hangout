@@ -46,6 +46,7 @@ final class Commands
         private readonly Settings $settings,
         private readonly Cache $cache,
         private readonly ConnectionInterface $db,
+        private readonly Outside $outside,
     ) {
     }
 
@@ -350,11 +351,16 @@ final class Commands
             }
             $who = '';
         }
+        // With a way out (Parley, ramon/chat, Messages), someone who isn't here can still be told.
+        $outside = $this->outside->target();
+        if ($outside !== null) {
+            $this->lookUp(array_filter(array_map('trim', explode(',', $who))));
+        }
         foreach (array_filter(array_map('trim', explode(',', $who))) as $name) {
             $user = match (true) {
-                (bool) preg_match('/^#(\d+)$/', $name, $m) => $this->find($m[1]),
+                (bool) preg_match('/^#(\d+)$/', $name, $m) => $this->find($m[1], $outside !== null),
                 ctype_digit($name) => $this->recalled($ctx, (int) $name),
-                default => $this->find($name),
+                default => $this->find($name, $outside !== null),
             };
             if (! $user) {
                 throw new HangoutException('not_connected', 404, ['name' => $name]);
@@ -385,6 +391,13 @@ final class Commands
             throw new HangoutException('page_wait', 429, ['seconds' => $wait]);
         }
         $this->limit($ctx);
+        [$sent, $refused] = $outside ? $this->sendOutside($ctx, $outside, $kind, $message, $targets) : [[], []];
+        foreach ($refused as $id => $name) {
+            unset($targets[$id]);
+        }
+        if (! $targets) {
+            throw new HangoutException('outside_refused', 403, ['name' => implode(', ', $refused)]);
+        }
         $event = $this->events->write([
             'audience' => 'user', 'kind' => $kind, 'room_id' => null, 'actor_id' => (int) $ctx->actor->id,
             'body' => $message !== '' ? $message : null,
@@ -394,6 +407,47 @@ final class Commands
             ],
         ], array_merge(array_keys($targets), [(int) $ctx->actor->id]));
         $ctx->events[] = $event;
+        if ($sent) {
+            $ctx->say('outside_sent', ['names' => array_values($sent), 'via' => $outside]);
+        }
+        if ($refused) {
+            $ctx->say('outside_refused', ['names' => array_values($refused), 'via' => $outside]);
+        }
+    }
+
+    /**
+     * The recipients who aren't in the Hangout get it as a direct message.
+     * Someone the sender can't see on the forum is as unknown as before.
+     *
+     * @param  array<int, User>  $targets
+     * @return array{0: array<int, string>, 1: array<int, string>} sent and refused, id => name
+     */
+    private function sendOutside(Ctx $ctx, string $outside, string $kind, string $message, array $targets): array
+    {
+        $here = array_map('intval', $this->db->table('hangout_presence')->whereIn('user_id', array_keys($targets))->pluck('user_id')->all());
+        $away = array_diff_key($targets, array_flip($here));
+        if (! $away) {
+            return [[], []];
+        }
+        $visible = array_map('intval', User::query()->whereVisibleTo($ctx->actor)->whereIn('id', array_keys($away))->pluck('id')->all());
+        foreach ($away as $id => $user) {
+            if (! in_array($id, $visible, true)) {
+                throw new HangoutException('not_connected', 404, ['name' => $user->username]);
+            }
+        }
+        if (count($away) > Outside::MAX) {
+            throw new HangoutException('outside_too_many', 422, ['max' => Outside::MAX]);
+        }
+        $sent = $refused = [];
+        foreach ($away as $id => $user) {
+            if ($this->outside->deliver($outside, $ctx->actor, $user, $kind, $message)) {
+                $sent[$id] = (string) $user->display_name;
+            } else {
+                $refused[$id] = (string) $user->display_name;
+            }
+        }
+
+        return [$sent, $refused];
     }
 
     private function reply(Ctx $ctx, string $args): void
@@ -650,6 +704,24 @@ final class Commands
      * the one name that starts with it (TCZ's partial matching). With
      * $anyone, members who aren't connected are found by exact name too.
      */
+    /** @var array<string, User|null> lower-case username or id => member, looked up in one query */
+    private array $known = [];
+
+    /** Look several names (or #ids) up at once, so find($name, true) doesn't query per name. */
+    private function lookUp(array $names): void
+    {
+        $names = array_map(fn ($n) => mb_strtolower(ltrim(trim($n), '#@')), $names);
+        $ids = array_filter($names, 'ctype_digit');
+        $usernames = array_diff($names, $ids);
+        if (! $names) {
+            return;
+        }
+        $users = User::query()->where(fn ($q) => $q->whereIn('id', $ids ?: [0])->orWhereIn('username', $usernames ?: ['']))->get();
+        foreach ($names as $name) {
+            $this->known[$name] = $users->first(fn (User $u) => ctype_digit($name) ? (int) $u->id === (int) $name : mb_strtolower((string) $u->username) === $name);
+        }
+    }
+
     public function find(string $name, bool $anyone = false): ?User
     {
         $name = trim(ltrim($name, '@'));
@@ -679,6 +751,10 @@ final class Commands
             return $starts[0];
         }
         if ($anyone) {
+            if (array_key_exists($lower, $this->known)) {
+                return $this->known[$lower];
+            }
+
             return ctype_digit($name) ? User::query()->find((int) $name) : User::query()->where('username', $name)->first();
         }
 

@@ -182,11 +182,19 @@ function renderEvent(live: Live, e: HEvent): Mithril.Children {
     case 'tell':
     case 'remote': {
       const group = (d.to || []).length > 1;
-      const key = mine ? `line.${e.k}_sent` : `line.${e.k}${group ? '_group' : ''}`;
+      // An answer to a whisper that went out, brought back from Chat or Messages.
+      const key = mine ? `line.${e.k}_sent` : d.via ? 'line.tell_via' : `line.${e.k}${group ? '_group' : ''}`;
       return (
         <div className={`HangoutLine HangoutLine--private${mine ? ' is-mine' : ''}`}>
           <span className="HangoutLine-time">{new Date(e.at * 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
-          {t(key, { name: who, to: to(d.to), loc: d.loc, text, others: to((d.to || []).filter((p: any) => p.id !== me)) })}
+          {t(key, {
+            name: who,
+            to: to(d.to),
+            loc: d.loc,
+            text,
+            others: to((d.to || []).filter((p: any) => p.id !== me)),
+            via: d.via ? tt(`outside.via.${d.via}`) : '',
+          })}
         </div>
       );
     }
@@ -345,6 +353,12 @@ function renderOut(live: Live, out: Record<string, any>): Mithril.Children {
             <p>{t('out.aliases_none')}</p>
           )}
         </div>
+      );
+    case 'outside_sent':
+    case 'outside_refused':
+      return sys(
+        t(`out.${k}`, { names: out.names.join(', '), count: out.names.length, via: tt(`outside.via.${out.via}`) }),
+        k === 'outside_refused' ? 'error' : 'info'
       );
     case 'partner_status':
       return sys(t(out.name ? `out.partner_${out.state}` : 'out.partner_none', { name: out.name }));

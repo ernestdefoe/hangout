@@ -61,15 +61,21 @@
                 "flarum/realtime",
                 "flarum/flags",
                 "flarum/suspend",
-                "flarum/tags"
+                "flarum/tags",
+                "ernestdefoe/parley",
+                "ramon/chat",
+                "flarum/messages"
             ]
         }
     },
     "require-dev": {
+        "ernestdefoe/parley": "^1.0",
         "flarum/flags": "^2.0",
+        "flarum/messages": "^2.0",
         "flarum/phpstan": "^2.0",
         "flarum/suspend": "^2.0",
-        "flarum/testing": "^2.0"
+        "flarum/testing": "^2.0",
+        "ramon/chat": ">=0.4"
     },
     "scripts": {
         "test": [
