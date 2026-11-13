@@ -799,18 +799,19 @@ export default class Stage {
     // Tags, bubbles and door names over everything, in screen pixels so they stay crisp and readable at any size.
     g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     const sorted = [...this.actors.values()].sort((p, q) => p.y - q.y);
-    for (const e of r.exits) this.drawDoorLabel(g, e);
+    // Door names are fixed: tags keep off them; a bubble stays by its speaker, and a name it still covers waits until it's gone.
+    const labels = r.exits.map((e) => ({ e, box: this.doorLabelBox(g, e) }));
     // Only people in view: a tag held at the edge for someone off camera would float with nobody under it.
     const seen = sorted.filter((a) => {
       const x = this.sx(a.x * T + T / 2);
       return x > -T / 2 && x < this.cssW() + T / 2;
     });
     // Name tags: front people keep their place; a tag behind that would overlap is lifted clear of it.
-    const tags: { x: number; y: number; w: number; h: number }[] = [];
+    const tags: { x: number; y: number; w: number; h: number }[] = labels.map((l) => l.box);
     const placed = [...seen].reverse().map((a) => ({ a, at: this.placeTag(g, a, tags, seen) }));
     for (const { a, at } of placed.reverse()) this.drawTag(g, a, at);
     // Front people's bubbles first; anyone behind whose bubble would overlap is lifted above it.
-    const taken: { x: number; y: number; w: number; h: number }[] = tags;
+    const taken: { x: number; y: number; w: number; h: number }[] = tags.slice(labels.length);
     // Bubbles avoid every tag and every other person's face too.
     const bubbles: { x: number; y: number; w: number; h: number }[] = [];
     for (const a of [...seen].reverse()) {
@@ -819,6 +820,10 @@ export default class Stage {
       this.drawBubble(g, a, now, around);
       if (around.length > before) bubbles.push(around[around.length - 1]);
     }
+    const over = (p: { x: number; y: number; w: number; h: number }, q: typeof p) =>
+      p.x < q.x + q.w && p.x + p.w > q.x && p.y < q.y + q.h && p.y + p.h > q.y;
+    const cover = [...taken, ...bubbles];
+    for (const { e, box } of labels) if (!cover.some((b) => over(box, b))) this.drawDoorLabel(g, e, box);
   }
 
   /** World px → CSS px on the canvas. */
@@ -852,11 +857,10 @@ export default class Stage {
     }
   }
 
-  private drawDoorLabel(g: CanvasRenderingContext2D, e: Exit) {
+  private doorLabelBox(g: CanvasRenderingContext2D, e: Exit): { x: number; y: number; w: number; h: number } {
     const d = this.doorRect(e);
-    const text = e.name;
     g.font = `600 11px ${this.font}`;
-    const w = g.measureText(text).width + 14;
+    const w = g.measureText(e.name).width + 14;
     let x = this.sx(d.x + d.w / 2) - w / 2;
     let y = this.sy(d.y) - 10;
     if (e.side === 'e') x = this.sx(d.x) - w + 6;
@@ -864,11 +868,16 @@ export default class Stage {
     if (e.side === 's') y = this.sy(d.y) - 12;
     x = Math.max(2, Math.min(this.cssW() - w - 2, x));
     y = Math.max(11, y);
-    pill(g, x, y - 9, w, 18, 'rgba(18,20,26,0.78)');
+    return { x, y: y - 9, w, h: 18 };
+  }
+
+  private drawDoorLabel(g: CanvasRenderingContext2D, e: Exit, box: { x: number; y: number; w: number; h: number }) {
+    g.font = `600 11px ${this.font}`;
+    pill(g, box.x, box.y, box.w, box.h, 'rgba(18,20,26,0.78)');
     g.fillStyle = '#ffe9b8';
     g.textAlign = 'left';
     g.textBaseline = 'middle';
-    g.fillText(text, x + 7, y);
+    g.fillText(e.name, box.x + 7, box.y + 9);
   }
 
   private drawItem(g: CanvasRenderingContext2D, item: Item, now: number) {
