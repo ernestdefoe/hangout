@@ -249,7 +249,10 @@ final class Moderation
         if (! $discussion->first_post_id) {
             $discussion->setFirstPost($post);
         }
+        // Staff see a hidden discussion in their list: new reports don't bump it (the flags menu is where they show).
+        $posted = $discussion->last_posted_at ?? $post->created_at;
         $discussion->setLastPost($post);
+        $discussion->last_posted_at = $posted;
         $discussion->refreshCommentCount();
         $discussion->refreshParticipantCount();
         $discussion->save();

@@ -100,14 +100,14 @@ function lineMenu(live: Live, e: HEvent): Mithril.Children {
       type="button"
       className="HangoutMsg-more"
       aria-label={tt('menu.open')}
-      aria-expanded={open}
+      aria-expanded={open ? 'true' : 'false'}
       title={tt('menu.open')}
       onclick={() => (live.menu = open ? null : e.i)}
     >
       ⋯
     </button>,
     open ? (
-      <div className="HangoutMsg-menu" role="group" aria-label={name}>
+      <div className="HangoutMsg-menu" role="group" aria-label={name} oncreate={(v: Mithril.VnodeDOM) => v.dom.scrollIntoView({ block: 'nearest' })}>
         {can.report ? (
           <button type="button" className="HangoutWord" onclick={() => run(`/report ${e.i}`)}>
             {t('menu.report')}
