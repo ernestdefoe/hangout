@@ -2,7 +2,7 @@
 
 namespace ErnestDefoe\Hangout;
 
-use Flarum\Locale\Translator;
+use Flarum\Locale\TranslatorInterface;
 
 /**
  * The world a new install starts with (the seed migration writes the same
@@ -29,7 +29,7 @@ final class Builtin
 
     private const KEY = 'ernestdefoe-hangout.forum.world.';
 
-    public function __construct(private readonly Translator $translator)
+    public function __construct(private readonly TranslatorInterface $translator)
     {
     }
 
