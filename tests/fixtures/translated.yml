@@ -1,0 +1,12 @@
+# A forum language that translates the built-in world (BuiltinTest).
+ernestdefoe-hangout:
+  forum:
+    world:
+      rooms:
+        lobby:
+          name: Le Hall
+        arcade:
+          name: La Salle de jeux
+      doors:
+        lobby_arcade: Salle de jeux
+        lobby_rooftop: Escalier du toit

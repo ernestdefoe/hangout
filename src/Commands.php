@@ -488,7 +488,7 @@ final class Commands
         if ($filter !== '') {
             $people = array_values(array_filter($people, fn ($p) => str_starts_with(mb_strtolower($p['n']), $filter) || str_starts_with(mb_strtolower($p['u']), $filter)));
         }
-        $rooms = $this->db->table('hangout_rooms')->pluck('name', 'id')->all();
+        $rooms = $this->world->roomNames();
         foreach ($people as &$p) {
             $p['room'] = $rooms[$p['r']] ?? '';
         }
@@ -537,7 +537,9 @@ final class Commands
         }
         foreach ($this->world->exits((int) $ctx->where->id) as $exit) {
             $to = $this->world->room((int) $exit->target_id);
-            if ($to && (str_starts_with(mb_strtolower((string) $exit->label), $name) || str_contains(mb_strtolower($to->name), $name))) {
+            $label = mb_strtolower((string) $this->world->doorLabel($exit, $ctx->where, $to));
+            // The seeded English still works on a translated forum.
+            if ($to && (str_starts_with($label, $name) || str_starts_with(mb_strtolower((string) $exit->label), $name) || str_contains(mb_strtolower($to->name), $name))) {
                 $this->through($ctx, $to);
 
                 return;

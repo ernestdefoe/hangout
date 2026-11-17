@@ -34,6 +34,7 @@ final class World
         private readonly Events $events,
         private readonly Ranks $ranks,
         private readonly SlugManager $slugs,
+        private readonly Builtin $builtin,
     ) {
     }
 
@@ -42,7 +43,7 @@ final class World
     public function room(int $id): ?object
     {
         if (! array_key_exists($id, $this->rooms)) {
-            $this->rooms[$id] = $this->db->table('hangout_rooms')->where('id', $id)->first();
+            $this->rooms[$id] = $this->builtin->room($this->db->table('hangout_rooms')->where('id', $id)->first());
         }
 
         return $this->rooms[$id];
@@ -55,13 +56,25 @@ final class World
             throw new HangoutException('no_rooms', 503);
         }
 
-        return $this->rooms[(int) $room->id] = $room;
+        return $this->rooms[(int) $room->id] = $this->builtin->room($room);
     }
 
     /** @return array<int, object> every room, for the map and `go <name>` */
     public function rooms(): array
     {
-        return $this->db->table('hangout_rooms')->orderBy('position')->orderBy('id')->get()->keyBy('id')->all();
+        return $this->db->table('hangout_rooms')->orderBy('position')->orderBy('id')->get()->keyBy('id')->map(fn ($r) => $this->builtin->room($r))->all();
+    }
+
+    /** @return array<int, string> room id => name, as shown */
+    public function roomNames(): array
+    {
+        return array_map(fn ($r) => (string) $r->name, $this->rooms());
+    }
+
+    /** A door's label as shown: a seeded one in the forum's language. */
+    public function doorLabel(object $exit, object $from, ?object $to): ?string
+    {
+        return $this->builtin->door($exit->label, $from->slug, $to?->slug);
     }
 
     /** @return array<int, object> */
@@ -96,7 +109,8 @@ final class World
     {
         $roomId = (int) $room->id;
         $exits = $this->exits($roomId);
-        $names = $exits ? $this->db->table('hangout_rooms')->whereIn('id', array_map(fn ($e) => $e->target_id, $exits))->pluck('name', 'id')->all() : [];
+        $targets = $exits ? $this->db->table('hangout_rooms')->whereIn('id', array_map(fn ($e) => $e->target_id, $exits))->get()->keyBy('id')->map(fn ($r) => $this->builtin->room($r))->all() : [];
+        $names = array_map(fn ($r) => (string) $r->name, $targets);
 
         return [
             'id' => $roomId,
@@ -111,7 +125,7 @@ final class World
             'exits' => array_map(fn ($e) => [
                 'id' => (int) $e->id,
                 'to' => (int) $e->target_id,
-                'name' => $e->label ?: ($names[$e->target_id] ?? ''),
+                'name' => $this->doorLabel($e, $room, $targets[$e->target_id] ?? null) ?: ($names[$e->target_id] ?? ''),
                 'room' => $names[$e->target_id] ?? '',
                 'side' => $e->side,
                 'pos' => (int) $e->pos,

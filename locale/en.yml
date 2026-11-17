@@ -95,6 +95,29 @@ ernestdefoe-hangout:
     duration:
       hm: "{h}h {m}m"
       m: "{m}m"
+    # The world a new install starts with. Shown while a room or door still has
+    # its seeded English text; anything an admin renames is shown as typed.
+    world:
+      rooms:
+        lobby:
+          name: The Lobby
+          description: A big, friendly entrance hall. The notice board on the wall carries the newest discussions, and doors lead off to the Arcade, the Lounge and the Rooftop.
+        arcade:
+          name: The Arcade
+          description: Rows of humming cabinets and a pinball table, lit mostly by their screens.
+        lounge:
+          name: The Lounge
+          description: Deep sofas, a crackling fire and a bar at the back. A good place to settle in.
+        rooftop:
+          name: The Rooftop
+          description: "Open sky over the town. The sky follows the forum's own clock: sunny by day, stars at night."
+      doors:
+        lobby_arcade: Arcade
+        lobby_rooftop: Rooftop stairs
+        lobby_lounge: Lounge
+        arcade_lobby: Lobby
+        lounge_lobby: Lobby
+        rooftop_lobby: Stairs down
     outside:
       label: Whisper from the Hangout
       body: "{label}: {text}\n\nAnswer here, or in the Hangout: {url}"

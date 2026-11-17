@@ -234,7 +234,7 @@ final class Social
         if ($verb === 'list' || $verb === '') {
             $ids = $this->ids($uid, $kind);
             $online = $ids ? $this->db->table('hangout_presence')->whereIn('user_id', $ids)->where('invisible', false)->pluck('room_id', 'user_id')->all() : [];
-            $rooms = $this->db->table('hangout_rooms')->pluck('name', 'id')->all();
+            $rooms = $this->world->roomNames();
             $people = User::query()->whereIn('id', $ids ?: [0])->get()->map(fn (User $u) => ['id' => (int) $u->id, 'n' => $u->display_name, 'room' => isset($online[$u->id]) ? ($rooms[$online[$u->id]] ?? '') : null])->all();
             $ctx->say($kind === 'friend' ? 'friends' : 'enemies', ['people' => $people]);
 
